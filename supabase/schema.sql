@@ -1,0 +1,1195 @@
+create extension if not exists pgcrypto;
+
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = timezone('utc', now());
+  return new;
+end;
+$$;
+
+create table if not exists public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  state_id text not null unique,
+  amigo_id text not null unique,
+  name text not null,
+  age integer not null check (age between 16 and 99),
+  bio text not null default '',
+  avatar_url text not null default '',
+  interests text[] not null default '{}',
+  friendship_goal text not null default 'casual-talk',
+  communication_formats text[] not null default '{}',
+  personality_tags text[] not null default '{}',
+  icebreaker text not null default '',
+  availability text not null default 'late-evenings',
+  title_text text not null default 'Гражданин',
+  title_category text not null default 'system',
+  title_icon text not null default 'CIV',
+  title_tone text not null default 'silver',
+  title_locked boolean not null default true,
+  granted_by uuid references auth.users (id) on delete set null,
+  titles jsonb not null default '[]'::jsonb,
+  active_title_id text,
+  capability_flags text[] not null default '{}',
+  coin_balance numeric not null default 0,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.profiles add column if not exists state_id text;
+alter table public.profiles add column if not exists amigo_id text;
+alter table public.profiles add column if not exists title_text text not null default 'Гражданин';
+alter table public.profiles add column if not exists title_category text not null default 'system';
+alter table public.profiles add column if not exists title_icon text not null default 'CIV';
+alter table public.profiles add column if not exists title_tone text not null default 'silver';
+alter table public.profiles add column if not exists title_locked boolean not null default true;
+alter table public.profiles add column if not exists granted_by uuid references auth.users (id) on delete set null;
+alter table public.profiles add column if not exists titles jsonb not null default '[]'::jsonb;
+alter table public.profiles add column if not exists active_title_id text;
+alter table public.profiles add column if not exists capability_flags text[] not null default '{}';
+alter table public.profiles add column if not exists coin_balance numeric not null default 0;
+
+create or replace function public.generate_state_id()
+returns text
+language plpgsql
+as $$
+declare
+  candidate text;
+begin
+  loop
+    candidate := lpad(((floor(random() * 1000000000))::bigint)::text, 9, '0');
+    exit when candidate <> '123545663'
+      and not exists (
+        select 1
+        from public.profiles
+        where state_id = candidate
+      );
+  end loop;
+
+  return candidate;
+end;
+$$;
+
+create or replace function public.generate_amigo_id(seed_name text default '')
+returns text
+language plpgsql
+as $$
+declare
+  base text;
+  candidate text;
+begin
+  base := upper(substr(regexp_replace(coalesce(seed_name, ''), '[^A-Za-z0-9]+', '', 'g'), 1, 8));
+  if base is null or base = '' then
+    base := 'USER';
+  end if;
+
+  loop
+    candidate := format('AMG-%s-%s', base, upper(substr(encode(gen_random_bytes(4), 'hex'), 1, 6)));
+    exit when not exists (
+      select 1
+      from public.profiles
+      where amigo_id = candidate
+    );
+  end loop;
+
+  return candidate;
+end;
+$$;
+
+create or replace function public.build_registration_title()
+returns jsonb
+language sql
+immutable
+as $$
+  select jsonb_build_object(
+    'id', 'registration-legionnaire',
+    'text', 'Легионер',
+    'category', 'system',
+    'icon', 'LEG',
+    'tone', 'silver',
+    'locked', true,
+    'grantedBy', null
+  );
+$$;
+
+create or replace function public.build_alpha_title()
+returns jsonb
+language sql
+immutable
+as $$
+  select jsonb_build_object(
+    'id', 'alpha-pretorian',
+    'text', 'Преторианец',
+    'category', 'system',
+    'icon', 'PRT',
+    'tone', 'gold',
+    'locked', true,
+    'grantedBy', null
+  );
+$$;
+
+create table if not exists public.alpha_invite_codes (
+  code text primary key,
+  label text not null default '',
+  max_uses integer not null default 1 check (max_uses > 0),
+  used_count integer not null default 0 check (used_count >= 0),
+  is_active boolean not null default true,
+  created_at timestamptz not null default timezone('utc', now()),
+  last_used_at timestamptz
+);
+
+create table if not exists public.alpha_invite_redemptions (
+  id uuid primary key default gen_random_uuid(),
+  code text not null references public.alpha_invite_codes (code) on delete restrict,
+  user_id uuid not null unique references auth.users (id) on delete cascade,
+  email text not null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists alpha_invite_redemptions_code_idx on public.alpha_invite_redemptions (code);
+
+alter table public.alpha_invite_codes enable row level security;
+alter table public.alpha_invite_redemptions enable row level security;
+
+create or replace function public.user_has_alpha_access(target_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.alpha_invite_redemptions
+    where user_id = target_user
+  );
+$$;
+
+create or replace function public.build_initial_titles_for_user(target_user uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  result jsonb := jsonb_build_array(public.build_registration_title());
+begin
+  if public.user_has_alpha_access(target_user) then
+    result := result || jsonb_build_array(public.build_alpha_title());
+  end if;
+
+  return public.normalize_profile_titles(result);
+end;
+$$;
+
+create or replace function public.build_admin_title(
+  title_text text,
+  title_icon text,
+  title_tone text,
+  granted_by uuid default null
+)
+returns jsonb
+language sql
+immutable
+as $$
+  select jsonb_build_object(
+    'id', 'admin-custom',
+    'text', trim(title_text),
+    'category', 'admin',
+    'icon', upper(coalesce(nullif(trim(title_icon), ''), 'ADM')),
+    'tone', coalesce(nullif(trim(title_tone), ''), 'gold'),
+    'locked', true,
+    'grantedBy', granted_by
+  );
+$$;
+
+create or replace function public.normalize_profile_titles(input_titles jsonb)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  normalized jsonb := '[]'::jsonb;
+  item jsonb;
+begin
+  if jsonb_typeof(input_titles) <> 'array' then
+    normalized := jsonb_build_array(public.build_registration_title());
+  else
+    for item in
+      select value
+      from jsonb_array_elements(input_titles)
+    loop
+      if jsonb_typeof(item) = 'object'
+         and coalesce(item->>'id', '') <> ''
+         and coalesce(item->>'text', '') <> '' then
+        normalized := normalized || jsonb_build_array(
+          jsonb_build_object(
+            'id', item->>'id',
+            'text', item->>'text',
+            'category', case when item->>'category' in ('system', 'admin') then item->>'category' else 'system' end,
+            'icon', upper(coalesce(nullif(item->>'icon', ''), 'TAG')),
+            'tone', case when item->>'tone' in ('silver', 'gold', 'cyan', 'royal') then item->>'tone' else 'silver' end,
+            'locked', coalesce((item->>'locked')::boolean, true),
+            'grantedBy', nullif(item->>'grantedBy', '')
+          )
+        );
+      end if;
+    end loop;
+  end if;
+
+  if not exists (
+    select 1
+    from jsonb_array_elements(normalized) as value
+    where value->>'id' = 'registration-legionnaire'
+  ) then
+    normalized := jsonb_build_array(public.build_registration_title()) || normalized;
+  end if;
+
+  return (
+    select coalesce(jsonb_agg(distinct_items.item), jsonb_build_array(public.build_registration_title()))
+    from (
+      select distinct on (value->>'id') value as item
+      from jsonb_array_elements(normalized) as value
+      order by value->>'id'
+    ) as distinct_items
+  );
+end;
+$$;
+
+create or replace function public.resolve_active_title_id(
+  input_titles jsonb,
+  requested_id text
+)
+returns text
+language plpgsql
+immutable
+as $$
+declare
+  normalized jsonb := public.normalize_profile_titles(input_titles);
+  first_id text;
+begin
+  if requested_id is not null and exists (
+    select 1
+    from jsonb_array_elements(normalized) as value
+    where value->>'id' = requested_id
+  ) then
+    return requested_id;
+  end if;
+
+  select value->>'id'
+  into first_id
+  from jsonb_array_elements(normalized) as value
+  limit 1;
+
+  return first_id;
+end;
+$$;
+
+create or replace function public.build_legacy_titles(
+  legacy_title_text text,
+  legacy_title_category text,
+  legacy_title_icon text,
+  legacy_title_tone text,
+  legacy_granted_by uuid
+)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  normalized_text text := trim(coalesce(legacy_title_text, ''));
+  result jsonb := jsonb_build_array(public.build_registration_title());
+begin
+  if normalized_text = '' or normalized_text = 'Гражданин' or normalized_text = 'Легионер' then
+    return result;
+  end if;
+
+  if normalized_text = 'Преторианец' then
+    return result || jsonb_build_array(public.build_alpha_title());
+  end if;
+
+  if coalesce(legacy_title_category, 'system') = 'system' then
+    return result || jsonb_build_array(
+      jsonb_build_object(
+        'id', 'legacy-system',
+        'text', normalized_text,
+        'category', 'system',
+        'icon', upper(coalesce(nullif(trim(legacy_title_icon), ''), 'SYS')),
+        'tone', coalesce(nullif(trim(legacy_title_tone), ''), 'silver'),
+        'locked', true,
+        'grantedBy', null
+      )
+    );
+  end if;
+
+  return result || jsonb_build_array(
+    public.build_admin_title(
+      normalized_text,
+      coalesce(legacy_title_icon, 'ADM'),
+      coalesce(legacy_title_tone, 'gold'),
+      legacy_granted_by
+    )
+  );
+end;
+$$;
+
+update public.profiles
+set amigo_id = public.generate_amigo_id(name)
+where amigo_id is null or btrim(amigo_id) = '';
+
+update public.profiles
+set state_id = public.generate_state_id()
+where state_id is null or btrim(state_id) = '';
+
+update public.profiles
+set titles = public.build_legacy_titles(title_text, title_category, title_icon, title_tone, granted_by)
+where titles is null
+   or jsonb_typeof(titles) <> 'array'
+   or jsonb_array_length(titles) = 0;
+
+update public.profiles
+set titles = public.normalize_profile_titles(titles),
+    active_title_id = public.resolve_active_title_id(
+      public.normalize_profile_titles(titles),
+      coalesce(active_title_id, 'registration-legionnaire')
+    );
+
+alter table public.profiles alter column state_id set not null;
+alter table public.profiles alter column amigo_id set not null;
+
+create table if not exists public.admin_roles (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  role text not null unique check (role in ('emperor')),
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.admin_roles enable row level security;
+
+create or replace function public.is_emperor_actor(actor_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.admin_roles
+    where user_id = actor_id
+      and role = 'emperor'
+  );
+$$;
+
+create or replace function public.prepare_profile_system_fields()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'INSERT' then
+    new.state_id = coalesce(nullif(new.state_id, ''), public.generate_state_id());
+    new.amigo_id = coalesce(nullif(new.amigo_id, ''), public.generate_amigo_id(new.name));
+
+    if coalesce(auth.role(), '') <> 'service_role' then
+      new.titles = jsonb_build_array(public.build_registration_title());
+      new.active_title_id = 'registration-legionnaire';
+      new.capability_flags = '{}'::text[];
+      new.coin_balance = 0;
+      new.title_text = 'Легионер';
+      new.title_category = 'system';
+      new.title_icon = 'LEG';
+      new.title_tone = 'silver';
+      new.title_locked = true;
+      new.granted_by = null;
+    else
+      new.titles = public.normalize_profile_titles(coalesce(new.titles, '[]'::jsonb));
+      new.active_title_id = public.resolve_active_title_id(new.titles, new.active_title_id);
+    end if;
+  else
+    new.state_id = old.state_id;
+    new.amigo_id = old.amigo_id;
+
+    if coalesce(auth.role(), '') <> 'service_role' then
+      new.titles = old.titles;
+      new.active_title_id = public.resolve_active_title_id(old.titles, new.active_title_id);
+      new.capability_flags = old.capability_flags;
+      new.coin_balance = old.coin_balance;
+    else
+      new.titles = public.normalize_profile_titles(coalesce(new.titles, old.titles));
+      new.active_title_id = public.resolve_active_title_id(new.titles, coalesce(new.active_title_id, old.active_title_id));
+    end if;
+
+    new.title_text = coalesce(
+      (
+        select value->>'text'
+        from jsonb_array_elements(new.titles) as value
+        where value->>'id' = new.active_title_id
+        limit 1
+      ),
+      'Легионер'
+    );
+    new.title_category = coalesce(
+      (
+        select value->>'category'
+        from jsonb_array_elements(new.titles) as value
+        where value->>'id' = new.active_title_id
+        limit 1
+      ),
+      'system'
+    );
+    new.title_icon = coalesce(
+      (
+        select value->>'icon'
+        from jsonb_array_elements(new.titles) as value
+        where value->>'id' = new.active_title_id
+        limit 1
+      ),
+      'LEG'
+    );
+    new.title_tone = coalesce(
+      (
+        select value->>'tone'
+        from jsonb_array_elements(new.titles) as value
+        where value->>'id' = new.active_title_id
+        limit 1
+      ),
+      'silver'
+    );
+    new.title_locked = true;
+    new.granted_by = nullif(
+      (
+        select value->>'grantedBy'
+        from jsonb_array_elements(new.titles) as value
+        where value->>'id' = new.active_title_id
+        limit 1
+      ),
+      ''
+    )::uuid;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_set_updated_at on public.profiles;
+create trigger profiles_set_updated_at
+before update on public.profiles
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists profiles_prepare_system_fields on public.profiles;
+create trigger profiles_prepare_system_fields
+before insert or update on public.profiles
+for each row
+execute function public.prepare_profile_system_fields();
+
+create index if not exists profiles_amigo_id_idx on public.profiles (amigo_id);
+create unique index if not exists profiles_state_id_idx on public.profiles (state_id);
+
+create table if not exists public.friendships (
+  id uuid primary key default gen_random_uuid(),
+  user_one uuid not null references auth.users (id) on delete cascade,
+  user_two uuid not null references auth.users (id) on delete cascade,
+  created_by uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default timezone('utc', now()),
+  constraint friendships_pair_unique unique (user_one, user_two),
+  constraint friendships_two_users check (user_one <> user_two)
+);
+
+create index if not exists friendships_user_one_idx on public.friendships (user_one);
+create index if not exists friendships_user_two_idx on public.friendships (user_two);
+
+create table if not exists public.friend_requests (
+  id uuid primary key default gen_random_uuid(),
+  requester_id uuid not null references auth.users (id) on delete cascade,
+  recipient_id uuid not null references auth.users (id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'declined', 'cancelled')),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint friend_requests_pair_unique unique (requester_id, recipient_id),
+  constraint friend_requests_not_self check (requester_id <> recipient_id)
+);
+
+create index if not exists friend_requests_requester_idx on public.friend_requests (requester_id, status);
+create index if not exists friend_requests_recipient_idx on public.friend_requests (recipient_id, status);
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  friendship_id uuid not null references public.friendships (id) on delete cascade,
+  sender_id uuid not null references auth.users (id) on delete cascade,
+  body text not null check (char_length(trim(body)) > 0),
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists messages_friendship_created_at_idx
+  on public.messages (friendship_id, created_at);
+
+alter table public.profiles enable row level security;
+alter table public.friendships enable row level security;
+alter table public.friend_requests enable row level security;
+alter table public.messages enable row level security;
+
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own"
+on public.profiles
+for select
+to authenticated
+using (
+  auth.uid() = id
+  and (
+    public.user_has_alpha_access(auth.uid())
+    or public.is_emperor_actor(auth.uid())
+  )
+);
+
+drop policy if exists "profiles_insert_own" on public.profiles;
+create policy "profiles_insert_own"
+on public.profiles
+for insert
+to authenticated
+with check (
+  auth.uid() = id
+  and (
+    public.user_has_alpha_access(auth.uid())
+    or public.is_emperor_actor(auth.uid())
+  )
+);
+
+drop policy if exists "profiles_update_own" on public.profiles;
+create policy "profiles_update_own"
+on public.profiles
+for update
+to authenticated
+using (
+  auth.uid() = id
+  and (
+    public.user_has_alpha_access(auth.uid())
+    or public.is_emperor_actor(auth.uid())
+  )
+)
+with check (
+  auth.uid() = id
+  and (
+    public.user_has_alpha_access(auth.uid())
+    or public.is_emperor_actor(auth.uid())
+  )
+);
+
+drop trigger if exists friend_requests_set_updated_at on public.friend_requests;
+create trigger friend_requests_set_updated_at
+before update on public.friend_requests
+for each row
+execute function public.set_updated_at();
+
+create or replace function public.set_custom_title(
+  target_user uuid,
+  next_title_text text,
+  next_title_icon text default 'ADM',
+  next_title_tone text default 'gold'
+)
+returns public.profiles
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_profile public.profiles;
+  next_titles jsonb;
+  updated_profile public.profiles;
+begin
+  if not public.is_emperor_actor(auth.uid()) then
+    raise exception 'Only the Emperor account can set custom titles.';
+  end if;
+
+  select *
+  into target_profile
+  from public.profiles
+  where id = target_user
+  limit 1;
+
+  if target_profile.id is null then
+    raise exception 'Target user was not found in profiles.';
+  end if;
+
+  next_titles := (
+    select coalesce(jsonb_agg(value), '[]'::jsonb)
+    from jsonb_array_elements(target_profile.titles) as value
+    where value->>'id' <> 'admin-custom'
+  ) || jsonb_build_array(public.build_admin_title(next_title_text, next_title_icon, next_title_tone, auth.uid()));
+
+  update public.profiles
+  set titles = next_titles,
+      active_title_id = public.resolve_active_title_id(next_titles, target_profile.active_title_id),
+      updated_at = timezone('utc', now())
+  where id = target_user
+  returning * into updated_profile;
+
+  return updated_profile;
+end;
+$$;
+
+revoke all on function public.set_custom_title(uuid, text, text, text) from public;
+revoke all on function public.set_custom_title(uuid, text, text, text) from anon;
+revoke all on function public.set_custom_title(uuid, text, text, text) from authenticated;
+
+create or replace function public.grant_alpha_title(target_user uuid)
+returns public.profiles
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_profile public.profiles;
+  next_titles jsonb;
+  updated_profile public.profiles;
+begin
+  if not public.is_emperor_actor(auth.uid()) then
+    raise exception 'Only the Emperor account can grant alpha titles.';
+  end if;
+
+  select *
+  into target_profile
+  from public.profiles
+  where id = target_user
+  limit 1;
+
+  if target_profile.id is null then
+    raise exception 'Target user was not found in profiles.';
+  end if;
+
+  next_titles := (
+    select coalesce(jsonb_agg(value), '[]'::jsonb)
+    from jsonb_array_elements(target_profile.titles) as value
+    where value->>'id' <> 'alpha-pretorian'
+  ) || jsonb_build_array(public.build_alpha_title());
+
+  update public.profiles
+  set titles = next_titles,
+      active_title_id = public.resolve_active_title_id(next_titles, target_profile.active_title_id),
+      updated_at = timezone('utc', now())
+  where id = target_user
+  returning * into updated_profile;
+
+  return updated_profile;
+end;
+$$;
+
+revoke all on function public.grant_alpha_title(uuid) from public;
+revoke all on function public.grant_alpha_title(uuid) from anon;
+revoke all on function public.grant_alpha_title(uuid) from authenticated;
+
+create or replace function public.set_active_profile_title(next_title_id text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor uuid := auth.uid();
+  target_profile public.profiles;
+  resolved_title_id text;
+begin
+  if actor is null then
+    raise exception 'Authentication required.';
+  end if;
+
+  select *
+  into target_profile
+  from public.profiles
+  where id = actor
+  limit 1;
+
+  if target_profile.id is null then
+    raise exception 'Profile not found.';
+  end if;
+
+  resolved_title_id := public.resolve_active_title_id(target_profile.titles, next_title_id);
+
+  if resolved_title_id <> next_title_id then
+    raise exception 'Selected title is not available for this profile.';
+  end if;
+
+  update public.profiles
+  set active_title_id = resolved_title_id,
+      updated_at = timezone('utc', now())
+  where id = actor;
+
+  return resolved_title_id;
+end;
+$$;
+
+grant execute on function public.set_active_profile_title(text) to authenticated;
+
+create or replace function public.prepare_profile_system_fields()
+returns trigger
+language plpgsql
+as $$
+declare
+  initial_titles jsonb;
+begin
+  if tg_op = 'INSERT' then
+    new.state_id = coalesce(nullif(new.state_id, ''), public.generate_state_id());
+    new.amigo_id = coalesce(nullif(new.amigo_id, ''), public.generate_amigo_id(new.name));
+
+    if coalesce(auth.role(), '') <> 'service_role' then
+      initial_titles := public.build_initial_titles_for_user(new.id);
+      new.titles = initial_titles;
+      new.active_title_id = public.resolve_active_title_id(initial_titles, 'registration-legionnaire');
+      new.capability_flags = '{}'::text[];
+      new.coin_balance = 0;
+      new.title_text = 'Легионер';
+      new.title_category = 'system';
+      new.title_icon = 'LEG';
+      new.title_tone = 'silver';
+      new.title_locked = true;
+      new.granted_by = null;
+    else
+      new.titles = public.normalize_profile_titles(coalesce(new.titles, '[]'::jsonb));
+      new.active_title_id = public.resolve_active_title_id(new.titles, new.active_title_id);
+    end if;
+  else
+    new.state_id = old.state_id;
+    new.amigo_id = old.amigo_id;
+
+    if coalesce(auth.role(), '') <> 'service_role' then
+      new.titles = old.titles;
+      new.active_title_id = public.resolve_active_title_id(old.titles, new.active_title_id);
+      new.capability_flags = old.capability_flags;
+      new.coin_balance = old.coin_balance;
+    else
+      new.titles = public.normalize_profile_titles(coalesce(new.titles, old.titles));
+      new.active_title_id = public.resolve_active_title_id(new.titles, coalesce(new.active_title_id, old.active_title_id));
+    end if;
+
+    new.title_text = coalesce(
+      (
+        select value->>'text'
+        from jsonb_array_elements(new.titles) as value
+        where value->>'id' = new.active_title_id
+        limit 1
+      ),
+      'Легионер'
+    );
+    new.title_category = coalesce(
+      (
+        select value->>'category'
+        from jsonb_array_elements(new.titles) as value
+        where value->>'id' = new.active_title_id
+        limit 1
+      ),
+      'system'
+    );
+    new.title_icon = coalesce(
+      (
+        select value->>'icon'
+        from jsonb_array_elements(new.titles) as value
+        where value->>'id' = new.active_title_id
+        limit 1
+      ),
+      'LEG'
+    );
+    new.title_tone = coalesce(
+      (
+        select value->>'tone'
+        from jsonb_array_elements(new.titles) as value
+        where value->>'id' = new.active_title_id
+        limit 1
+      ),
+      'silver'
+    );
+    new.title_locked = coalesce(
+      (
+        select coalesce((value->>'locked')::boolean, true)
+        from jsonb_array_elements(new.titles) as value
+        where value->>'id' = new.active_title_id
+        limit 1
+      ),
+      true
+    );
+    new.granted_by = (
+      select nullif(value->>'grantedBy', '')::uuid
+      from jsonb_array_elements(new.titles) as value
+      where value->>'id' = new.active_title_id
+      limit 1
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.consume_alpha_invite(invite_code text, target_user uuid, target_email text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  normalized_code text := upper(trim(coalesce(invite_code, '')));
+  target_record public.alpha_invite_codes;
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'Only service role can consume alpha invites.';
+  end if;
+
+  if normalized_code = '' then
+    raise exception 'Invite code is required.';
+  end if;
+
+  if target_user is null then
+    raise exception 'Target user is required.';
+  end if;
+
+  select *
+  into target_record
+  from public.alpha_invite_codes
+  where code = normalized_code
+    and is_active = true
+  for update;
+
+  if target_record.code is null then
+    raise exception 'Invite code was not found or is inactive.';
+  end if;
+
+  if target_record.used_count >= target_record.max_uses then
+    raise exception 'Invite code has no remaining activations.';
+  end if;
+
+  insert into public.alpha_invite_redemptions (code, user_id, email)
+  values (normalized_code, target_user, lower(trim(target_email)));
+
+  update public.alpha_invite_codes
+  set used_count = used_count + 1,
+      last_used_at = timezone('utc', now())
+  where code = normalized_code;
+
+  return jsonb_build_object(
+    'code', normalized_code,
+    'remainingUses', greatest(target_record.max_uses - target_record.used_count - 1, 0)
+  );
+end;
+$$;
+
+revoke all on function public.consume_alpha_invite(text, uuid, text) from public;
+revoke all on function public.consume_alpha_invite(text, uuid, text) from anon;
+revoke all on function public.consume_alpha_invite(text, uuid, text) from authenticated;
+
+create or replace function public.list_directory_profiles(current_actor uuid)
+returns table (
+  id uuid,
+  amigo_id text,
+  name text,
+  age integer,
+  bio text,
+  avatar_url text,
+  interests text[],
+  friendship_goal text,
+  communication_formats text[],
+  personality_tags text[],
+  icebreaker text,
+  availability text,
+  titles jsonb,
+  active_title_id text,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    profiles.id,
+    profiles.amigo_id,
+    profiles.name,
+    profiles.age,
+    profiles.bio,
+    profiles.avatar_url,
+    profiles.interests,
+    profiles.friendship_goal,
+    profiles.communication_formats,
+    profiles.personality_tags,
+    profiles.icebreaker,
+    profiles.availability,
+    profiles.titles,
+    profiles.active_title_id,
+    profiles.created_at,
+    profiles.updated_at
+  from public.profiles
+  where profiles.id <> current_actor
+  order by profiles.updated_at desc;
+$$;
+
+create or replace function public.get_directory_profile_by_amigo_id(target_amigo_id text)
+returns table (
+  id uuid,
+  amigo_id text,
+  name text,
+  age integer,
+  bio text,
+  avatar_url text,
+  interests text[],
+  friendship_goal text,
+  communication_formats text[],
+  personality_tags text[],
+  icebreaker text,
+  availability text,
+  titles jsonb,
+  active_title_id text,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    profiles.id,
+    profiles.amigo_id,
+    profiles.name,
+    profiles.age,
+    profiles.bio,
+    profiles.avatar_url,
+    profiles.interests,
+    profiles.friendship_goal,
+    profiles.communication_formats,
+    profiles.personality_tags,
+    profiles.icebreaker,
+    profiles.availability,
+    profiles.titles,
+    profiles.active_title_id,
+    profiles.created_at,
+    profiles.updated_at
+  from public.profiles
+  where profiles.amigo_id = upper(trim(target_amigo_id))
+  limit 1;
+$$;
+
+create or replace function public.get_directory_profiles_by_ids(target_ids uuid[])
+returns table (
+  id uuid,
+  amigo_id text,
+  name text,
+  age integer,
+  bio text,
+  avatar_url text,
+  interests text[],
+  friendship_goal text,
+  communication_formats text[],
+  personality_tags text[],
+  icebreaker text,
+  availability text,
+  titles jsonb,
+  active_title_id text,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    profiles.id,
+    profiles.amigo_id,
+    profiles.name,
+    profiles.age,
+    profiles.bio,
+    profiles.avatar_url,
+    profiles.interests,
+    profiles.friendship_goal,
+    profiles.communication_formats,
+    profiles.personality_tags,
+    profiles.icebreaker,
+    profiles.availability,
+    profiles.titles,
+    profiles.active_title_id,
+    profiles.created_at,
+    profiles.updated_at
+  from public.profiles
+  where profiles.id = any(target_ids);
+$$;
+
+grant execute on function public.list_directory_profiles(uuid) to authenticated;
+grant execute on function public.get_directory_profile_by_amigo_id(text) to authenticated;
+grant execute on function public.get_directory_profiles_by_ids(uuid[]) to authenticated;
+
+create or replace function public.accept_friend_request(target_request uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor uuid := auth.uid();
+  target_row public.friend_requests;
+  normalized_user_one uuid;
+  normalized_user_two uuid;
+  result_friendship uuid;
+begin
+  if actor is null then
+    raise exception 'Authentication required.';
+  end if;
+
+  select *
+  into target_row
+  from public.friend_requests
+  where id = target_request
+    and status = 'pending'
+  limit 1;
+
+  if target_row.id is null then
+    raise exception 'Request not found.';
+  end if;
+
+  if target_row.recipient_id <> actor then
+    raise exception 'Only the recipient can accept the request.';
+  end if;
+
+  normalized_user_one := least(target_row.requester_id, target_row.recipient_id);
+  normalized_user_two := greatest(target_row.requester_id, target_row.recipient_id);
+
+  insert into public.friendships (user_one, user_two, created_by)
+  values (normalized_user_one, normalized_user_two, actor)
+  on conflict (user_one, user_two)
+  do update set created_by = public.friendships.created_by
+  returning id into result_friendship;
+
+  update public.friend_requests
+  set status = 'accepted',
+      updated_at = timezone('utc', now())
+  where id = target_request;
+
+  update public.friend_requests
+  set status = 'accepted',
+      updated_at = timezone('utc', now())
+  where requester_id = target_row.recipient_id
+    and recipient_id = target_row.requester_id
+    and status = 'pending';
+
+  return result_friendship;
+end;
+$$;
+
+create or replace function public.request_friendship(target_user uuid)
+returns table (
+  request_id uuid,
+  became_friends boolean,
+  friendship_id uuid
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor uuid := auth.uid();
+  existing_friendship public.friendships;
+  reverse_request public.friend_requests;
+  inserted_request public.friend_requests;
+  accepted_friendship_id uuid;
+begin
+  if actor is null then
+    raise exception 'Authentication required.';
+  end if;
+
+  if target_user is null or actor = target_user then
+    raise exception 'Invalid target user.';
+  end if;
+
+  select *
+  into existing_friendship
+  from public.friendships
+  where (user_one = actor and user_two = target_user)
+     or (user_one = target_user and user_two = actor)
+  limit 1;
+
+  if existing_friendship.id is not null then
+    return query select null::uuid, true, existing_friendship.id;
+    return;
+  end if;
+
+  select *
+  into reverse_request
+  from public.friend_requests
+  where requester_id = target_user
+    and recipient_id = actor
+    and status = 'pending'
+  limit 1;
+
+  if reverse_request.id is not null then
+    accepted_friendship_id := public.accept_friend_request(reverse_request.id);
+    return query select reverse_request.id, true, accepted_friendship_id;
+    return;
+  end if;
+
+  insert into public.friend_requests (requester_id, recipient_id, status)
+  values (actor, target_user, 'pending')
+  on conflict (requester_id, recipient_id)
+  do update
+    set status = 'pending',
+        updated_at = timezone('utc', now())
+  returning * into inserted_request;
+
+  return query select inserted_request.id, false, null::uuid;
+end;
+$$;
+
+grant execute on function public.request_friendship(uuid) to authenticated;
+grant execute on function public.accept_friend_request(uuid) to authenticated;
+
+drop policy if exists "friend_requests_select_members" on public.friend_requests;
+create policy "friend_requests_select_members"
+on public.friend_requests
+for select
+to authenticated
+using (auth.uid() = requester_id or auth.uid() = recipient_id);
+
+drop policy if exists "friendships_select_members" on public.friendships;
+create policy "friendships_select_members"
+on public.friendships
+for select
+to authenticated
+using (auth.uid() = user_one or auth.uid() = user_two);
+
+drop policy if exists "messages_select_members" on public.messages;
+create policy "messages_select_members"
+on public.messages
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.friendships
+    where friendships.id = messages.friendship_id
+      and (auth.uid() = friendships.user_one or auth.uid() = friendships.user_two)
+  )
+);
+
+drop policy if exists "messages_insert_members" on public.messages;
+create policy "messages_insert_members"
+on public.messages
+for insert
+to authenticated
+with check (
+  auth.uid() = sender_id
+  and exists (
+    select 1
+    from public.friendships
+    where friendships.id = messages.friendship_id
+      and (auth.uid() = friendships.user_one or auth.uid() = friendships.user_two)
+  )
+);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'messages'
+  ) then
+    alter publication supabase_realtime add table public.messages;
+  end if;
+end;
+$$;
