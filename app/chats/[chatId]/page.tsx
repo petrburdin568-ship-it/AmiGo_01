@@ -118,7 +118,6 @@ export default function ChatPage() {
         <section className="reference-sheet stack-lg">
           <div className="reference-sheet-top">
             <span className="reference-brand-label">AmiGo</span>
-            <span className="reference-sheet-label">Чат</span>
           </div>
           <div className="reference-bottom-action reference-bottom-action-left">
             <Link className="button button-primary" href="/auth">
@@ -136,7 +135,6 @@ export default function ChatPage() {
         <section className="reference-sheet stack-lg">
           <div className="reference-sheet-top">
             <span className="reference-brand-label">AmiGo</span>
-            <span className="reference-sheet-label">Чат</span>
           </div>
           <div className="reference-sheet-block">
             <p className="reference-sheet-copy">Загружаем переписку...</p>
@@ -152,7 +150,6 @@ export default function ChatPage() {
         <section className="reference-sheet stack-lg">
           <div className="reference-sheet-top">
             <span className="reference-brand-label">AmiGo</span>
-            <span className="reference-sheet-label">Чат</span>
           </div>
           {message ? <div className="reference-sheet-message">{message}</div> : null}
           <div className="reference-bottom-action reference-bottom-action-left">
@@ -167,40 +164,43 @@ export default function ChatPage() {
 
   return (
     <AppShell mode="chat" title="" description="">
-      {message ? <div className="toast-panel reference-chat-toast">{message}</div> : null}
+      {message ? <div className="toast-panel tg-chat-toast">{message}</div> : null}
 
-      <section className="reference-chat-shell">
-        <div className="reference-card-bar reference-chat-bar">
-          <Link className="reference-chat-back" href="/chats">
-            Назад
-          </Link>
+      <section className="tg-chat-shell">
+        <div className="tg-chatbar">
+          <div className="tg-chatbar-main">
+            <Link className="tg-chatbar-back" href="/chats">
+              Назад
+            </Link>
 
-          <Link className="reference-chat-user" href={`/friends/${friend.friendshipId}`}>
-            <UserAvatar name={friend.profile.name} size="sm" src={friend.profile.avatar} />
-            <div className="reference-chat-user-copy">
-              <strong>{friend.profile.name}</strong>
-              <span>{friend.profile.amigoId}</span>
-            </div>
+            <Link className="tg-chatbar-user" href={`/friends/${friend.friendshipId}`}>
+              <UserAvatar className="tg-chat-avatar" name={friend.profile.name} size="sm" src={friend.profile.avatar} />
+              <div className="tg-chatbar-copy">
+                <strong>{friend.profile.name}</strong>
+                <span>{friend.profile.amigoId}</span>
+              </div>
+            </Link>
+          </div>
+
+          <Link className="tg-chatbar-profile" href={`/friends/${friend.friendshipId}`}>
+            Профиль
           </Link>
         </div>
 
-        <div className="reference-chat-messages">
+        <div className="tg-chat-messages">
           {messages.length === 0 ? (
-            <div className="reference-chat-service">Напиши первое сообщение</div>
+            <div className="tg-service-badge">Напиши первое сообщение</div>
           ) : (
             messages.map((item) => (
-              <div
-                key={item.id}
-                className={`reference-chat-bubble ${item.sender === "me" ? "reference-chat-bubble-out" : "reference-chat-bubble-in"}`}
-              >
+              <div key={item.id} className={`tg-bubble ${item.sender === "me" ? "tg-bubble-out" : "tg-bubble-in"}`}>
                 {item.text}
               </div>
             ))
           )}
         </div>
 
-        <form className="reference-chat-compose" onSubmit={handleSubmit}>
-          <button className="reference-chat-plus" type="button">
+        <form className="tg-chat-compose" onSubmit={handleSubmit}>
+          <button aria-label="Добавить" className="tg-compose-icon" type="button">
             +
           </button>
           <textarea
@@ -209,7 +209,7 @@ export default function ChatPage() {
             rows={1}
             value={draft}
           />
-          <button className="reference-chat-send" disabled={!canSend} type="submit">
+          <button className="tg-compose-send" disabled={!canSend} type="submit">
             Отпр.
           </button>
         </form>
