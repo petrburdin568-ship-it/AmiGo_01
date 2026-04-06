@@ -519,6 +519,13 @@ create table if not exists public.friendship_members (
 
 create index if not exists friendship_members_user_idx on public.friendship_members (user_id, friendship_id);
 
+create table if not exists public.user_presence (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  is_online boolean not null default false,
+  last_seen_at timestamptz,
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 create table if not exists public.friend_requests (
   id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references auth.users (id) on delete cascade,
@@ -542,6 +549,9 @@ create table if not exists public.messages (
   media_url text,
   media_path text,
   reply_to_message_id uuid references public.messages (id) on delete set null,
+  deleted_for_all boolean not null default false,
+  deleted_at timestamptz,
+  forwarded_from_message_id uuid references public.messages (id) on delete set null,
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -549,6 +559,9 @@ alter table public.messages add column if not exists message_type text;
 alter table public.messages add column if not exists media_url text;
 alter table public.messages add column if not exists media_path text;
 alter table public.messages add column if not exists reply_to_message_id uuid references public.messages (id) on delete set null;
+alter table public.messages add column if not exists deleted_for_all boolean not null default false;
+alter table public.messages add column if not exists deleted_at timestamptz;
+alter table public.messages add column if not exists forwarded_from_message_id uuid references public.messages (id) on delete set null;
 alter table public.messages alter column message_type set default 'text';
 update public.messages set message_type = 'text' where message_type is null;
 alter table public.messages alter column message_type set not null;
@@ -564,6 +577,7 @@ alter table public.profiles enable row level security;
 alter table public.friendships enable row level security;
 alter table public.friendship_members enable row level security;
 alter table public.friend_requests enable row level security;
+alter table public.user_presence enable row level security;
 alter table public.messages enable row level security;
 
 drop policy if exists "profiles_select_own" on public.profiles;
@@ -587,6 +601,28 @@ for update
 to authenticated
 using (auth.uid() = id)
 with check (auth.uid() = id);
+
+drop policy if exists "user_presence_select_authenticated" on public.user_presence;
+create policy "user_presence_select_authenticated"
+on public.user_presence
+for select
+to authenticated
+using (true);
+
+drop policy if exists "user_presence_insert_own" on public.user_presence;
+create policy "user_presence_insert_own"
+on public.user_presence
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+drop policy if exists "user_presence_update_own" on public.user_presence;
+create policy "user_presence_update_own"
+on public.user_presence
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
 
 drop trigger if exists friend_requests_set_updated_at on public.friend_requests;
 create trigger friend_requests_set_updated_at
@@ -1207,6 +1243,79 @@ end;
 $$;
 
 grant execute on function public.mark_friendship_read(uuid) to authenticated;
+
+create or replace function public.touch_presence(next_online boolean default true)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor uuid := auth.uid();
+  touched_at timestamptz := timezone('utc', now());
+begin
+  if actor is null then
+    raise exception 'Authentication required.';
+  end if;
+
+  insert into public.user_presence (user_id, is_online, last_seen_at, updated_at)
+  values (actor, next_online, touched_at, touched_at)
+  on conflict (user_id)
+  do update set
+    is_online = excluded.is_online,
+    last_seen_at = excluded.last_seen_at,
+    updated_at = excluded.updated_at;
+
+  return touched_at;
+end;
+$$;
+
+grant execute on function public.touch_presence(boolean) to authenticated;
+
+create or replace function public.delete_message_for_everyone(target_message uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor uuid := auth.uid();
+  target_row public.messages;
+begin
+  if actor is null then
+    raise exception 'Authentication required.';
+  end if;
+
+  select *
+  into target_row
+  from public.messages
+  where id = target_message
+  limit 1;
+
+  if target_row.id is null then
+    raise exception 'Message not found.';
+  end if;
+
+  if target_row.sender_id <> actor then
+    raise exception 'Only sender can delete message for everyone.';
+  end if;
+
+  update public.messages
+  set body = 'Сообщение удалено',
+      message_type = 'text',
+      media_url = null,
+      media_path = null,
+      reply_to_message_id = null,
+      forwarded_from_message_id = null,
+      deleted_for_all = true,
+      deleted_at = timezone('utc', now())
+  where id = target_message;
+
+  return target_message;
+end;
+$$;
+
+grant execute on function public.delete_message_for_everyone(uuid) to authenticated;
 
 drop policy if exists "friend_requests_select_members" on public.friend_requests;
 create policy "friend_requests_select_members"

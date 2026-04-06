@@ -9,28 +9,54 @@ import { UserAvatar } from "@/components/user-avatar";
 import { listFriends } from "@/lib/supabase/queries";
 import type { ChatMessageType, FriendRecord } from "@/lib/types";
 
-function getChatPreview(type: ChatMessageType, text: string, language: "ru" | "en") {
-  if (type === "image") {
-    return language === "ru" ? "Фотография" : "Photo";
+function getChatPreview(friend: FriendRecord, language: "ru" | "en") {
+  const lastMessage = friend.lastMessage;
+  if (!lastMessage) {
+    return friend.profile.bio;
   }
 
-  if (type === "video") {
-    return language === "ru" ? "Видео" : "Video";
+  if (lastMessage.text === "Сообщение удалено") {
+    return language === "ru" ? "Сообщение удалено" : "Message deleted";
   }
 
-  if (type === "sticker") {
-    return language === "ru" ? "Стикер" : "Sticker";
+  const prefix = lastMessage.sender === "me" ? (language === "ru" ? "Ты: " : "You: ") : "";
+
+  const dictionary: Record<ChatMessageType, string> = {
+    text: lastMessage.text,
+    image: language === "ru" ? "Фотография" : "Photo",
+    video: language === "ru" ? "Видео" : "Video",
+    sticker: language === "ru" ? "Стикер" : "Sticker",
+    voice: language === "ru" ? "Голосовое" : "Voice message",
+    "video-note": language === "ru" ? "Кружок" : "Video note"
+  };
+
+  return `${prefix}${dictionary[lastMessage.type]}`;
+}
+
+function getPresenceCopy(friend: FriendRecord, language: "ru" | "en") {
+  if (friend.presence.isOnline) {
+    return language === "ru" ? "в сети" : "online";
   }
 
-  if (type === "voice") {
-    return language === "ru" ? "Голосовое" : "Voice message";
+  if (!friend.presence.lastSeenAt) {
+    return language === "ru" ? "был недавно" : "seen recently";
   }
 
-  if (type === "video-note") {
-    return language === "ru" ? "Кружок" : "Video note";
+  const lastSeen = new Date(friend.presence.lastSeenAt);
+  const now = new Date();
+  const diffMinutes = Math.max(0, Math.round((now.getTime() - lastSeen.getTime()) / 60000));
+
+  if (diffMinutes < 2) {
+    return language === "ru" ? "был только что" : "just now";
   }
 
-  return text;
+  if (diffMinutes < 60) {
+    return language === "ru" ? `был ${diffMinutes} мин назад` : `${diffMinutes} min ago`;
+  }
+
+  return language === "ru"
+    ? `был ${lastSeen.toLocaleDateString("ru-RU")}`
+    : lastSeen.toLocaleDateString("en-US");
 }
 
 export default function ChatsPage() {
@@ -53,7 +79,6 @@ export default function ChatsPage() {
           loadError: "Не удалось загрузить чаты.",
           inbox: "Твои диалоги",
           hint: "Все активные переписки в одном месте.",
-          you: "Ты: ",
           unread: "Новых",
           locale: "ru-RU" as const
         }
@@ -69,7 +94,6 @@ export default function ChatsPage() {
           loadError: "Failed to load chats.",
           inbox: "Your conversations",
           hint: "All active conversations in one place.",
-          you: "You: ",
           unread: "New",
           locale: "en-US" as const
         };
@@ -100,7 +124,10 @@ export default function ChatsPage() {
 
     const channel = supabase
       .channel(`chat-list:${currentUserId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
+        void loadFriendsList();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, () => {
         void loadFriendsList();
       })
       .subscribe();
@@ -168,43 +195,44 @@ export default function ChatsPage() {
             </div>
           ) : (
             <div className="tg-dialog-list">
-              {sortedFriends.map((friend) => {
-                const preview = friend.lastMessage
-                  ? `${friend.lastMessage.sender === "me" ? copy.you : ""}${getChatPreview(
-                      friend.lastMessage.type,
-                      friend.lastMessage.text,
-                      language
-                    )}`
-                  : friend.profile.bio || copy.chatReady;
-
-                return (
-                  <article key={friend.friendshipId} className="tg-dialog-row">
-                    <Link className="tg-dialog-avatar" href={`/friends/${friend.friendshipId}`}>
+              {sortedFriends.map((friend) => (
+                <article key={friend.friendshipId} className="tg-dialog-row">
+                  <Link className="tg-dialog-avatar" href={`/friends/${friend.friendshipId}`}>
+                    <span className="tg-dialog-avatar-wrap">
                       <UserAvatar name={friend.profile.name} size="sm" src={friend.profile.avatar} />
-                    </Link>
+                      <span className={`tg-presence-dot ${friend.presence.isOnline ? "tg-presence-dot-online" : ""}`} />
+                    </span>
+                  </Link>
 
-                    <Link className="tg-dialog-main" href={`/chats/${friend.friendshipId}`}>
-                      <div className="tg-dialog-top">
-                        <strong>{friend.profile.name}</strong>
-                        <span>{new Date(friend.lastMessage?.sentAt ?? friend.createdAt).toLocaleDateString(copy.locale)}</span>
-                      </div>
+                  <Link className="tg-dialog-main" href={`/chats/${friend.friendshipId}`}>
+                    <div className="tg-dialog-top">
+                      <strong>{friend.profile.name}</strong>
+                      <span>{new Date(friend.lastMessage?.sentAt ?? friend.createdAt).toLocaleDateString(copy.locale)}</span>
+                    </div>
 
-                      <div className="tg-dialog-bottom">
-                        <p className={friend.unreadCount > 0 ? "tg-dialog-preview-unread" : ""}>{preview}</p>
-                        {friend.unreadCount > 0 ? (
-                          <span className="tg-dialog-badge" aria-label={`${copy.unread}: ${friend.unreadCount}`}>
-                            {friend.unreadCount}
-                          </span>
-                        ) : null}
-                      </div>
-                    </Link>
+                    <div className="tg-dialog-middle">
+                      <span className={`tg-dialog-status ${friend.presence.isOnline ? "tg-dialog-status-online" : ""}`}>
+                        {getPresenceCopy(friend, language)}
+                      </span>
+                    </div>
 
-                    <Link className="tg-dialog-side" href={`/friends/${friend.friendshipId}`}>
-                      {copy.profile}
-                    </Link>
-                  </article>
-                );
-              })}
+                    <div className="tg-dialog-bottom">
+                      <p className={friend.unreadCount > 0 ? "tg-dialog-preview-unread" : ""}>
+                        {getChatPreview(friend, language) || copy.chatReady}
+                      </p>
+                      {friend.unreadCount > 0 ? (
+                        <span className="tg-dialog-badge" aria-label={`${copy.unread}: ${friend.unreadCount}`}>
+                          {friend.unreadCount}
+                        </span>
+                      ) : null}
+                    </div>
+                  </Link>
+
+                  <Link className="tg-dialog-side" href={`/friends/${friend.friendshipId}`}>
+                    {copy.profile}
+                  </Link>
+                </article>
+              ))}
             </div>
           )}
         </div>

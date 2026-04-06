@@ -7,9 +7,11 @@ import {
   type MessageRow,
   type ProfileRow,
   type PublicProfileRow,
+  type UserPresenceRow,
   mapFriendRecord,
   mapFriendRequestRecord,
   mapMessageRow,
+  mapPresenceRow,
   mapProfileRow,
   mapPublicProfileRow,
   profileToUpsertRow
@@ -187,7 +189,12 @@ export async function listFriends(supabase: SupabaseClient, currentUserId: strin
   const friendshipIds = friendshipRows.map((item) => item.id);
   const friendIds = friendshipRows.map((item) => (item.user_one === currentUserId ? item.user_two : item.user_one));
 
-  const [{ data: profiles, error: profilesError }, { data: memberRows, error: membersError }, { data: messageRows, error: messagesError }] =
+  const [
+    { data: profiles, error: profilesError },
+    { data: memberRows, error: membersError },
+    { data: messageRows, error: messagesError },
+    { data: presenceRows, error: presenceError }
+  ] =
     await Promise.all([
       supabase.rpc("get_directory_profiles_by_ids", { target_ids: friendIds }),
       supabase
@@ -199,7 +206,8 @@ export async function listFriends(supabase: SupabaseClient, currentUserId: strin
         .from("messages")
         .select("*")
         .in("friendship_id", friendshipIds)
-        .order("created_at", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase.from("user_presence").select("*").in("user_id", friendIds)
     ]);
 
   if (profilesError) {
@@ -214,8 +222,13 @@ export async function listFriends(supabase: SupabaseClient, currentUserId: strin
     throw messagesError;
   }
 
+  if (presenceError) {
+    throw presenceError;
+  }
+
   const profileMap = new Map(((profiles ?? []) as PublicProfileRow[]).map((profile) => [profile.id, mapPublicProfileRow(profile)]));
   const memberMap = new Map(((memberRows ?? []) as FriendshipMemberRow[]).map((item) => [item.friendship_id, item]));
+  const presenceMap = new Map(((presenceRows ?? []) as UserPresenceRow[]).map((item) => [item.user_id, mapPresenceRow(item)]));
   const messagesByFriendship = new Map<string, MessageRow[]>();
 
   for (const row of (messageRows ?? []) as MessageRow[]) {
@@ -241,6 +254,7 @@ export async function listFriends(supabase: SupabaseClient, currentUserId: strin
       return mapFriendRecord(friendship, profile, {
         lastReadAt,
         unreadCount,
+        presence: presenceMap.get(friendId),
         lastMessage: latest
           ? {
               id: latest.id,
@@ -278,7 +292,12 @@ export async function getFriendshipDetails(supabase: SupabaseClient, currentUser
     return null;
   }
 
-  const [{ data: profile, error: profileError }, { data: memberState, error: memberError }, { data: latestMessage, error: latestMessageError }] =
+  const [
+    { data: profile, error: profileError },
+    { data: memberState, error: memberError },
+    { data: latestMessage, error: latestMessageError },
+    { data: presenceRow, error: presenceError }
+  ] =
     await Promise.all([
       supabase.rpc("get_directory_profiles_by_ids", {
         target_ids: [friendId]
@@ -295,7 +314,8 @@ export async function getFriendshipDetails(supabase: SupabaseClient, currentUser
         .eq("friendship_id", friendshipId)
         .order("created_at", { ascending: false })
         .limit(1)
-        .maybeSingle()
+        .maybeSingle(),
+      supabase.from("user_presence").select("*").eq("user_id", friendId).maybeSingle()
     ]);
 
   if (profileError) {
@@ -310,6 +330,10 @@ export async function getFriendshipDetails(supabase: SupabaseClient, currentUser
     throw latestMessageError;
   }
 
+  if (presenceError) {
+    throw presenceError;
+  }
+
   const safeProfile = Array.isArray(profile) ? profile[0] : profile;
 
   if (!safeProfile) {
@@ -319,6 +343,7 @@ export async function getFriendshipDetails(supabase: SupabaseClient, currentUser
   return mapFriendRecord(friendshipRow, mapPublicProfileRow(safeProfile as PublicProfileRow), {
     lastReadAt: (memberState as FriendshipMemberRow | null)?.last_read_at ?? null,
     unreadCount: 0,
+    presence: mapPresenceRow((presenceRow as UserPresenceRow | null) ?? null),
     lastMessage: latestMessage
       ? {
           id: (latestMessage as MessageRow).id,
@@ -397,6 +422,26 @@ export async function sendMessage(
   }
 }
 
+async function insertMessageRow(
+  supabase: SupabaseClient,
+  row: {
+    friendship_id: string;
+    sender_id: string;
+    body: string;
+    message_type: MessageRow["message_type"];
+    media_url: string | null;
+    media_path: string | null;
+    reply_to_message_id: string | null;
+    forwarded_from_message_id?: string | null;
+  }
+) {
+  const { error } = await supabase.from("messages").insert(row);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function sendStickerMessage(
   supabase: SupabaseClient,
   friendshipId: string,
@@ -404,7 +449,7 @@ export async function sendStickerMessage(
   sticker: string,
   options: SendMessageOptions = {}
 ) {
-  const { error } = await supabase.from("messages").insert({
+  await insertMessageRow(supabase, {
     friendship_id: friendshipId,
     sender_id: senderId,
     body: sticker,
@@ -413,10 +458,6 @@ export async function sendStickerMessage(
     media_path: null,
     reply_to_message_id: options.replyToMessageId ?? null
   });
-
-  if (error) {
-    throw error;
-  }
 }
 
 function inferMediaExtension(type: "image" | "video" | "voice" | "video-note", file: File) {
@@ -486,7 +527,7 @@ async function sendMediaMessage(
     data: { publicUrl }
   } = bucket.getPublicUrl(path);
 
-  const { error } = await supabase.from("messages").insert({
+  await insertMessageRow(supabase, {
     friendship_id: friendshipId,
     sender_id: senderId,
     body: type,
@@ -495,10 +536,6 @@ async function sendMediaMessage(
     media_path: path,
     reply_to_message_id: options.replyToMessageId ?? null
   });
-
-  if (error) {
-    throw error;
-  }
 }
 
 export async function sendImageMessage(
@@ -553,12 +590,48 @@ export async function markFriendshipRead(supabase: SupabaseClient, friendshipId:
   return data as string;
 }
 
-export async function deleteOwnMessage(supabase: SupabaseClient, messageId: string) {
-  const { error } = await supabase.from("messages").delete().eq("id", messageId);
+export async function deleteMessageForEveryone(supabase: SupabaseClient, messageId: string) {
+  const { data, error } = await supabase.rpc("delete_message_for_everyone", {
+    target_message: messageId
+  });
 
   if (error) {
     throw error;
   }
+
+  return data as string;
+}
+
+export async function touchPresence(supabase: SupabaseClient, isOnline = true) {
+  const { error } = await supabase.rpc("touch_presence", {
+    next_online: isOnline
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function forwardMessage(
+  supabase: SupabaseClient,
+  friendshipId: string,
+  senderId: string,
+  message: ChatMessage
+) {
+  if (message.deletedForAll) {
+    throw new Error("Удалённое сообщение нельзя переслать.");
+  }
+
+  await insertMessageRow(supabase, {
+    friendship_id: friendshipId,
+    sender_id: senderId,
+    body: message.text,
+    message_type: message.type,
+    media_url: message.mediaUrl,
+    media_path: null,
+    reply_to_message_id: null,
+    forwarded_from_message_id: message.id
+  });
 }
 
 export function appendIncomingMessage(current: ChatMessage[], row: MessageRow, currentUserId: string) {

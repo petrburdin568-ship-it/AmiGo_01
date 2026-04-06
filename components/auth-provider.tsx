@@ -3,7 +3,7 @@
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { getProfileByUserId } from "@/lib/supabase/queries";
+import { getProfileByUserId, touchPresence } from "@/lib/supabase/queries";
 import { resolveAccessProfile } from "@/lib/title-system";
 import type { Capability, UserAccessProfile, UserProfile } from "@/lib/types";
 
@@ -101,6 +101,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loadProfile, supabase]);
 
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    let active = true;
+
+    async function syncPresence(nextOnline: boolean) {
+      try {
+        await touchPresence(supabase, nextOnline);
+      } catch {
+        // best effort
+      }
+    }
+
+    void syncPresence(true);
+
+    const interval = setInterval(() => {
+      if (active && document.visibilityState === "visible") {
+        void syncPresence(true);
+      }
+    }, 25000);
+
+    function handleVisibility() {
+      void syncPresence(document.visibilityState === "visible");
+    }
+
+    function handlePageHide() {
+      void syncPresence(false);
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", handlePageHide);
+      void syncPresence(false);
+    };
+  }, [session, supabase]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       supabase,
@@ -133,6 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAdminUnlocked(await fetchAdminAccess(session));
       },
       signOut: async () => {
+        await touchPresence(supabase, false).catch(() => undefined);
         await supabase.auth.signOut();
         setProfile(null);
         setAdminUnlocked(false);

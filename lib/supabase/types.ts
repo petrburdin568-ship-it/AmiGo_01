@@ -3,6 +3,7 @@ import type {
   ChatMessage,
   CommunicationFormat,
   FriendshipGoal,
+  FriendPresence,
   FriendRecord,
   FriendRequestDirection,
   FriendRequestRecord,
@@ -51,6 +52,13 @@ export type FriendshipMemberRow = {
   last_read_at: string | null;
 };
 
+export type UserPresenceRow = {
+  user_id: string;
+  is_online: boolean;
+  last_seen_at: string | null;
+  updated_at: string;
+};
+
 export type MessageRow = {
   id: string;
   friendship_id: string;
@@ -60,6 +68,9 @@ export type MessageRow = {
   media_url: string | null;
   media_path: string | null;
   reply_to_message_id: string | null;
+  deleted_for_all: boolean | null;
+  deleted_at: string | null;
+  forwarded_from_message_id: string | null;
   created_at: string;
 };
 
@@ -144,7 +155,7 @@ export function profileToUpsertRow(profile: UserProfile) {
 export function mapFriendRecord(
   friendship: FriendshipRow,
   profile: UserProfile,
-  state?: Partial<Pick<FriendRecord, "unreadCount" | "lastReadAt" | "lastMessage">>
+  state?: Partial<Pick<FriendRecord, "unreadCount" | "lastReadAt" | "lastMessage" | "presence">>
 ): FriendRecord {
   return {
     friendshipId: friendship.id,
@@ -152,6 +163,10 @@ export function mapFriendRecord(
     createdAt: friendship.created_at,
     unreadCount: state?.unreadCount ?? 0,
     lastReadAt: state?.lastReadAt ?? null,
+    presence: state?.presence ?? {
+      isOnline: false,
+      lastSeenAt: null
+    },
     lastMessage: state?.lastMessage ?? null
   };
 }
@@ -179,6 +194,16 @@ export function mapMessageRow(row: MessageRow, currentUserId: string): ChatMessa
     mediaUrl: row.media_url,
     sentAt: row.created_at,
     replyToMessageId: row.reply_to_message_id,
-    replyPreview: null
+    replyPreview: null,
+    deletedForAll: row.deleted_for_all === true,
+    deletedAt: row.deleted_at,
+    forwardedFromMessageId: row.forwarded_from_message_id
+  };
+}
+
+export function mapPresenceRow(row: UserPresenceRow | null | undefined): FriendPresence {
+  return {
+    isOnline: row?.is_online === true,
+    lastSeenAt: row?.last_seen_at ?? null
   };
 }

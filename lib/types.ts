@@ -118,12 +118,18 @@ export type ChatMessageReply = {
   sentAt: string;
 };
 
+export type FriendPresence = {
+  isOnline: boolean;
+  lastSeenAt: string | null;
+};
+
 export type FriendRecord = {
   friendshipId: string;
   profile: UserProfile;
   createdAt: string;
   unreadCount: number;
   lastReadAt: string | null;
+  presence: FriendPresence;
   lastMessage: {
     id: string;
     sender: "me" | "them";
@@ -153,4 +159,7 @@ export type ChatMessage = {
   sentAt: string;
   replyToMessageId: string | null;
   replyPreview: ChatMessageReply | null;
+  deletedForAll: boolean;
+  deletedAt: string | null;
+  forwardedFromMessageId: string | null;
 };
