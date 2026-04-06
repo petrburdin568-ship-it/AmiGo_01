@@ -135,6 +135,9 @@ export default function ChatPage() {
   const mediaChunksRef = useRef<Blob[]>([]);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const recordingKindRef = useRef<RecordingKind>(null);
+  const discardRecordingRef = useRef(false);
+  const restartVideoNoteRef = useRef(false);
+  const cameraFacingRef = useRef<"user" | "environment">("user");
 
   const [friend, setFriend] = useState<FriendRecord | null>(null);
   const [rawMessages, setRawMessages] = useState<ChatMessage[]>([]);
@@ -151,6 +154,7 @@ export default function ChatPage() {
   const [recordingKind, setRecordingKind] = useState<RecordingKind>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [cameraPreviewStream, setCameraPreviewStream] = useState<MediaStream | null>(null);
+  const [cameraFacingMode, setCameraFacingMode] = useState<"user" | "environment">("user");
 
   const messages = useMemo(() => {
     const messageMap = new Map(rawMessages.map((item) => [item.id, item]));
@@ -182,6 +186,10 @@ export default function ChatPage() {
       videoPreviewRef.current.srcObject = cameraPreviewStream;
     }
   }, [cameraPreviewStream]);
+
+  useEffect(() => {
+    cameraFacingRef.current = cameraFacingMode;
+  }, [cameraFacingMode]);
 
   useEffect(() => {
     if (!recordingKind) {
@@ -536,6 +544,7 @@ export default function ChatPage() {
   }
 
   function openFilePicker() {
+    setStickersOpen(false);
     fileInputRef.current?.click();
   }
 
@@ -636,7 +645,7 @@ export default function ChatPage() {
           : {
               audio: true,
               video: {
-                facingMode: "user",
+                facingMode: cameraFacingRef.current,
                 width: { ideal: 720 },
                 height: { ideal: 720 }
               }
@@ -667,12 +676,23 @@ export default function ChatPage() {
 
       recorder.onstop = () => {
         const nextKind = recordingKindRef.current;
+        const shouldDiscard = discardRecordingRef.current;
+        const shouldRestart = restartVideoNoteRef.current;
         const blob = new Blob(mediaChunksRef.current, {
           type: mediaChunksRef.current[0]?.type || (nextKind === "voice" ? "audio/webm" : "video/webm")
         });
         cleanupRecording();
         recordingKindRef.current = null;
-        if (blob.size > 0 && nextKind) {
+        discardRecordingRef.current = false;
+        restartVideoNoteRef.current = false;
+        if (shouldRestart) {
+          setRecordingSeconds(0);
+          setTimeout(() => {
+            void startRecording("video-note");
+          }, 0);
+          return;
+        }
+        if (!shouldDiscard && blob.size > 0 && nextKind) {
           void finishRecording(nextKind, blob);
         } else {
           setRecordingSeconds(0);
@@ -726,6 +746,37 @@ export default function ChatPage() {
     }
 
     await startRecording("video-note");
+  }
+
+  function toggleMediaMenu() {
+    setStickersOpen((current) => !current);
+  }
+
+  async function handleVoiceAction() {
+    setStickersOpen(false);
+    await toggleVoiceRecording();
+  }
+
+  async function handleVideoNoteAction() {
+    setStickersOpen(false);
+    await toggleVideoNoteRecording();
+  }
+
+  function handleFileAction() {
+    openFilePicker();
+  }
+
+  function switchCameraMode() {
+    const nextFacing = cameraFacingRef.current === "user" ? "environment" : "user";
+    cameraFacingRef.current = nextFacing;
+    setCameraFacingMode(nextFacing);
+
+    if (recordingKind === "video-note" && mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      discardRecordingRef.current = true;
+      restartVideoNoteRef.current = true;
+      setRecordingKind(null);
+      mediaRecorderRef.current.stop();
+    }
   }
 
   if (!session && !loading) {
@@ -898,7 +949,8 @@ export default function ChatPage() {
                     role="button"
                     tabIndex={0}
                   >
-                    <video className="tg-bubble-video-note" loop muted playsInline preload="metadata" src={item.mediaUrl} />
+                    <video autoPlay className="tg-bubble-video-note" loop muted playsInline preload="metadata" src={item.mediaUrl} />
+                    <span className="tg-video-note-play">▶</span>
                     <span className="tg-video-note-ring" />
                   </div>
                 ) : null}
@@ -921,21 +973,41 @@ export default function ChatPage() {
 
         <form className="tg-chat-compose" onSubmit={handleSubmit}>
           {stickersOpen ? (
-            <div className="tg-sticker-panel">
-              {STICKER_OPTIONS.map((sticker) => (
-                <button
-                  key={sticker.id}
-                  className="tg-sticker-item"
-                  onClick={() => void handleStickerSend(sticker.emoji)}
-                  title={sticker.label}
-                  type="button"
-                >
-                  <span aria-label={sticker.label} className="tg-sticker-item-emoji" role="img">
-                    {sticker.emoji}
-                  </span>
-                  <span className="tg-sticker-item-label">{sticker.label}</span>
+            <div className="tg-media-panel">
+              <div className="tg-media-actions">
+                <button className="tg-media-action" onClick={() => handleFileAction()} type="button">
+                  <span>🖼</span>
+                  <strong>Фото и видео</strong>
                 </button>
-              ))}
+                <button className="tg-media-action" onClick={() => void handleVoiceAction()} type="button">
+                  <span>🎙</span>
+                  <strong>Голосовое</strong>
+                </button>
+                <button className="tg-media-action" onClick={() => void handleVideoNoteAction()} type="button">
+                  <span>◉</span>
+                  <strong>Кружок</strong>
+                </button>
+              </div>
+
+              <div className="tg-media-stickers">
+                <div className="tg-media-panel-title">Стикеры</div>
+                <div className="tg-sticker-grid">
+                  {STICKER_OPTIONS.map((sticker) => (
+                    <button
+                      key={sticker.id}
+                      className="tg-sticker-item"
+                      onClick={() => void handleStickerSend(sticker.emoji)}
+                      title={sticker.label}
+                      type="button"
+                    >
+                      <span aria-label={sticker.label} className="tg-sticker-item-emoji" role="img">
+                        {sticker.emoji}
+                      </span>
+                      <span className="tg-sticker-item-label">{sticker.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -959,9 +1031,14 @@ export default function ChatPage() {
               </div>
 
               {recordingKind === "video-note" ? (
-                <div className="tg-recording-preview">
-                  <video autoPlay className="tg-recording-preview-video" muted playsInline ref={videoPreviewRef} />
-                </div>
+                <>
+                  <div className="tg-recording-preview">
+                    <video autoPlay className="tg-recording-preview-video" muted playsInline ref={videoPreviewRef} />
+                  </div>
+                  <button className="tg-recording-switch" onClick={() => switchCameraMode()} type="button">
+                    {cameraFacingMode === "user" ? "Задняя" : "Фронтальная"}
+                  </button>
+                </>
               ) : null}
 
               <button className="tg-recording-stop" onClick={() => stopRecording()} type="button">
@@ -972,35 +1049,13 @@ export default function ChatPage() {
 
           <input accept="image/*,video/*" className="tg-file-input" onChange={handleMediaSelect} ref={fileInputRef} type="file" />
 
-          <button aria-label="Добавить файл" className="tg-compose-icon" onClick={openFilePicker} type="button">
-            +
-          </button>
-
           <button
-            aria-label="Открыть стикеры"
+            aria-label="Открыть меню вложений"
             className={`tg-compose-icon ${stickersOpen ? "tg-compose-icon-active" : ""}`}
-            onClick={() => setStickersOpen((current) => !current)}
+            onClick={() => toggleMediaMenu()}
             type="button"
           >
-            ☺
-          </button>
-
-          <button
-            aria-label={recordingKind === "voice" ? "Остановить запись голосового" : "Записать голосовое"}
-            className={`tg-compose-icon ${recordingKind === "voice" ? "tg-compose-icon-active" : ""}`}
-            onClick={() => void toggleVoiceRecording()}
-            type="button"
-          >
-            🎙
-          </button>
-
-          <button
-            aria-label={recordingKind === "video-note" ? "Остановить запись кружка" : "Записать кружок"}
-            className={`tg-compose-icon ${recordingKind === "video-note" ? "tg-compose-icon-active" : ""}`}
-            onClick={() => void toggleVideoNoteRecording()}
-            type="button"
-          >
-            ◉
+            +
           </button>
 
           <textarea
