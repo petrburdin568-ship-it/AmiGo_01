@@ -2060,10 +2060,12 @@ body[data-theme="dark"] .tg-list-panel {
   height: 64px;
   padding: 0 20px;
   border-radius: 999px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--metal) 92%, white), color-mix(in srgb, var(--metal) 70%, #c38b00));
+  background: linear-gradient(180deg, #ffe27a 0%, #ffcf2f 46%, #d89d00 100%);
   color: #241903;
   font-weight: 700;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 12px 30px rgba(216, 157, 0, 0.2);
 }
 
 .tg-chat-toast {
@@ -2164,10 +2166,10 @@ body[data-theme="dark"] .tg-chat-shell {
   align-items: center;
   padding: 0 12px;
   min-height: 34px;
-  border: 1px solid color-mix(in srgb, var(--stroke) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--metal) 44%, var(--stroke));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-muted) 70%, transparent);
-  color: var(--muted);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--metal-soft) 44%, transparent), color-mix(in srgb, var(--bg-muted) 88%, transparent));
+  color: color-mix(in srgb, var(--metal) 48%, var(--text));
   font-size: 0.88rem;
 }
 
@@ -2176,9 +2178,10 @@ body[data-theme="dark"] .tg-chat-shell {
   align-items: center;
   min-height: 36px;
   padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--stroke) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--metal) 44%, var(--stroke));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-muted) 70%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--metal-soft) 44%, transparent), color-mix(in srgb, var(--bg-muted) 88%, transparent));
+  color: color-mix(in srgb, var(--metal) 44%, var(--text));
   white-space: nowrap;
 }
 
@@ -2224,41 +2227,41 @@ body[data-theme="dark"] .tg-chat-shell {
 }
 
 .tg-bubble {
-  max-width: min(72%, 620px);
-  padding: 10px 12px 8px;
-  border-radius: 20px;
-  line-height: 1.55;
+  max-width: min(68%, 520px);
+  padding: 8px 10px 7px;
+  border-radius: 18px;
+  line-height: 1.48;
   white-space: pre-wrap;
   border: 1px solid transparent;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
 }
 
 .tg-bubble-image {
   display: block;
-  width: min(320px, 100%);
+  width: min(280px, 100%);
   max-width: 100%;
-  border-radius: 16px;
+  border-radius: 14px;
   object-fit: cover;
 }
 
 .tg-bubble-video {
   display: block;
-  width: min(360px, 100%);
+  width: min(320px, 100%);
   max-width: 100%;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #000;
 }
 
 .tg-bubble-sticker-shell {
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .tg-sticker-bubble {
   display: grid;
   place-items: center;
-  min-width: 96px;
-  min-height: 96px;
-  font-size: 3.3rem;
+  min-width: 84px;
+  min-height: 84px;
+  font-size: 2.9rem;
   line-height: 1;
 }
 
@@ -2271,23 +2274,27 @@ body[data-theme="dark"] .tg-chat-shell {
 .tg-bubble-out {
   align-self: flex-end;
   border-top-right-radius: 10px;
-  border-color: color-mix(in srgb, var(--metal) 44%, transparent);
+  border-color: color-mix(in srgb, var(--metal) 58%, transparent);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--metal) 78%, white),
-    color-mix(in srgb, var(--metal-soft) 58%, transparent)
+    color-mix(in srgb, var(--metal) 90%, white),
+    color-mix(in srgb, var(--metal) 76%, #d89d00)
   );
   color: #251b04;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 10px 24px rgba(216, 157, 0, 0.14);
 }
 
 .tg-bubble-text {
   word-break: break-word;
+  font-size: 0.95rem;
 }
 
 .tg-bubble-meta {
-  margin-top: 6px;
+  margin-top: 4px;
   text-align: right;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: color-mix(in srgb, currentColor 62%, transparent);
 }
 
@@ -2440,16 +2447,19 @@ body[data-theme="dark"] .tg-chat-shell {
 
 .tg-compose-icon-active {
   border-color: color-mix(in srgb, var(--metal) 50%, var(--stroke));
-  background: color-mix(in srgb, var(--metal-soft) 42%, var(--bg-muted));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--metal-soft) 56%, transparent), color-mix(in srgb, var(--bg-muted) 86%, transparent));
   color: var(--metal);
 }
 
 .tg-compose-send {
   min-width: 84px;
   padding: 0 18px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--metal) 88%, white), color-mix(in srgb, var(--metal) 76%, #c59510));
+  background: linear-gradient(180deg, #ffe27a 0%, #ffcf2f 46%, #d89d00 100%);
   color: #251b04;
   font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 10px 24px rgba(216, 157, 0, 0.16);
 }
 
 .tg-compose-send:disabled {
@@ -2549,7 +2559,7 @@ body[data-theme="dark"] .tg-chat-shell {
   }
 
   .tg-bubble {
-    max-width: 86%;
+    max-width: 82%;
   }
 
   .tg-chat-compose {
