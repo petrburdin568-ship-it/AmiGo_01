@@ -180,7 +180,7 @@ export default function DiscoverPage() {
         <div className="screen-heading-row">
           <div className="stack-xs">
             <h1 className="reference-sheet-heading">Поиск</h1>
-            <p className="reference-sheet-copy">Фильтруй каталог по интересам или добавляй человека по его AmiGo ID.</p>
+            <p className="reference-sheet-copy">Ищи людей по интересам или добавляй напрямую по AmiGo ID.</p>
           </div>
           <Link className="button button-secondary" href="/requests">
             Заявки
@@ -191,9 +191,13 @@ export default function DiscoverPage() {
           <div className="discover-plain-block stack-md">
             <div className="panel-title">Добавить по ID</div>
             <div className="chat-input-row">
-              <input onChange={(event) => setIdLookup(event.target.value)} value={idLookup} />
+              <input
+                onChange={(event) => setIdLookup(event.target.value)}
+                placeholder="AMG-USER-0001"
+                value={idLookup}
+              />
               <button className="button button-primary" onClick={() => void handleAddById()} type="button">
-                Отправить
+                Добавить
               </button>
             </div>
             <p className="reference-sheet-copy">
@@ -203,7 +207,12 @@ export default function DiscoverPage() {
 
           <div className="discover-plain-block stack-md">
             <div className="panel-title">Фильтры</div>
-            <input onChange={(event) => setQuery(event.target.value)} value={query} />
+            <input
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Имя, интерес или описание"
+              value={query}
+            />
+
             <div className="tag-cloud">
               <button
                 className={`tag tag-selectable ${selectedInterest === "all" ? "tag-selected" : ""}`}
@@ -223,6 +232,7 @@ export default function DiscoverPage() {
                 </button>
               ))}
             </div>
+
             <label className="checkbox-row">
               <input
                 checked={onlyNotFriends}

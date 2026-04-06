@@ -1,9 +1,4 @@
-import type {
-  CommunicationFormat,
-  FriendshipGoal,
-  Interest,
-  PersonalityTag
-} from "@/lib/types";
+import type { CommunicationFormat, FriendshipGoal, Interest, PersonalityTag } from "@/lib/types";
 
 type Option<T extends string> = {
   value: T;

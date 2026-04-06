@@ -31,49 +31,49 @@
 
 body[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #081321;
-  --bg-elevated: rgba(9, 21, 37, 0.92);
-  --bg-muted: rgba(13, 28, 46, 0.86);
-  --bg-sidebar: rgba(7, 18, 33, 0.96);
-  --bg-chat: rgba(8, 19, 33, 0.94);
-  --stroke: rgba(56, 83, 118, 0.28);
+  --bg: #06101c;
+  --bg-elevated: rgba(7, 17, 30, 0.88);
+  --bg-muted: rgba(10, 22, 38, 0.8);
+  --bg-sidebar: rgba(5, 14, 25, 0.94);
+  --bg-chat: rgba(6, 16, 28, 0.92);
+  --stroke: rgba(50, 74, 104, 0.22);
   --stroke-strong: rgba(255, 205, 84, 0.6);
   --text: #f4f8ff;
-  --muted: #8ea1bb;
-  --accent: #16385c;
-  --accent-strong: #234f82;
-  --accent-soft: rgba(28, 67, 112, 0.3);
+  --muted: #8395ad;
+  --accent: #122d49;
+  --accent-strong: #1b426b;
+  --accent-soft: rgba(19, 46, 74, 0.24);
   --metal: #ffd13a;
-  --metal-soft: rgba(255, 217, 84, 0.46);
+  --metal-soft: rgba(255, 217, 84, 0.34);
   --success-soft: rgba(16, 185, 129, 0.18);
-  --glow-cyan: rgba(27, 67, 118, 0.22);
-  --glow-gold: rgba(255, 210, 58, 0.22);
+  --glow-cyan: rgba(20, 48, 80, 0.14);
+  --glow-gold: rgba(255, 210, 58, 0.14);
   --shadow: 0 32px 90px rgba(0, 0, 0, 0.62);
   --shadow-strong: 0 38px 110px rgba(0, 0, 0, 0.76);
 }
 
 body[data-theme="dark"] {
   background:
-    radial-gradient(circle at 14% 16%, rgba(23, 56, 92, 0.2), transparent 24%),
-    radial-gradient(circle at 84% 12%, rgba(255, 210, 58, 0.08), transparent 18%),
-    radial-gradient(circle at 56% 84%, rgba(17, 43, 72, 0.18), transparent 32%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 18%),
-    linear-gradient(180deg, #0b1624 0%, #081321 52%, #07111d 100%);
+    radial-gradient(circle at 14% 16%, rgba(18, 44, 72, 0.12), transparent 24%),
+    radial-gradient(circle at 84% 12%, rgba(255, 210, 58, 0.04), transparent 18%),
+    radial-gradient(circle at 56% 84%, rgba(14, 34, 56, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.008), transparent 14%),
+    linear-gradient(180deg, #08111b 0%, #06101c 52%, #050d17 100%);
 }
 
 body[data-theme="dark"]::before {
   background:
-    radial-gradient(circle at 24% 28%, rgba(29, 66, 108, 0.14), transparent 22%),
-    radial-gradient(circle at 78% 22%, rgba(255, 210, 58, 0.06), transparent 18%),
-    radial-gradient(circle at 48% 62%, rgba(20, 46, 78, 0.1), transparent 26%);
-  opacity: 1;
-  filter: blur(18px);
+    radial-gradient(circle at 24% 28%, rgba(21, 49, 80, 0.08), transparent 22%),
+    radial-gradient(circle at 78% 22%, rgba(255, 210, 58, 0.03), transparent 18%),
+    radial-gradient(circle at 48% 62%, rgba(16, 38, 62, 0.06), transparent 26%);
+  opacity: 0.88;
+  filter: blur(22px);
 }
 
 body[data-theme="dark"]::after {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 22%),
-    linear-gradient(180deg, transparent 0%, rgba(3, 8, 16, 0.24) 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent 18%),
+    linear-gradient(180deg, transparent 0%, rgba(2, 6, 12, 0.32) 100%);
   mix-blend-mode: normal;
 }
 
@@ -2086,10 +2086,10 @@ body[data-theme="dark"] .tg-list-panel {
 
 body[data-theme="dark"] .tg-chat-shell {
   background:
-    radial-gradient(circle at 18% 12%, rgba(37, 99, 235, 0.16), transparent 22%),
-    radial-gradient(circle at 82% 0%, rgba(245, 197, 24, 0.09), transparent 20%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 18%),
-    #0d1626;
+    radial-gradient(circle at 18% 12%, rgba(21, 53, 88, 0.12), transparent 22%),
+    radial-gradient(circle at 82% 0%, rgba(245, 197, 24, 0.05), transparent 20%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent 16%),
+    #07111c;
 }
 
 .tg-chatbar {
@@ -2113,19 +2113,17 @@ body[data-theme="dark"] .tg-chat-shell {
 .tg-chatbar-back {
   display: inline-flex;
   align-items: center;
-  height: 38px;
-  padding: 0 14px;
-  border: 1px solid color-mix(in srgb, var(--stroke-strong) 72%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-muted) 88%, transparent);
-  color: var(--text);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
   font-weight: 600;
-  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+  transition: color 0.16s ease, transform 0.16s ease;
 }
 
 .tg-chatbar-back:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--metal) 36%, var(--stroke-strong));
+  color: var(--text);
 }
 
 .tg-chatbar-user {
@@ -2163,10 +2161,9 @@ body[data-theme="dark"] .tg-chat-shell {
 .tg-chatbar-status {
   display: inline-flex;
   align-items: center;
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-muted) 92%, transparent);
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--muted);
   font-size: 0.88rem;
 }
@@ -2174,11 +2171,9 @@ body[data-theme="dark"] .tg-chat-shell {
 .tg-chatbar-profile {
   display: inline-flex;
   align-items: center;
-  height: 38px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--stroke-strong) 72%, transparent);
-  background: color-mix(in srgb, var(--bg-muted) 88%, transparent);
+  padding: 0;
+  border: 0;
+  background: transparent;
   white-space: nowrap;
 }
 
@@ -2207,10 +2202,10 @@ body[data-theme="dark"] .tg-chat-shell {
   gap: 8px;
   align-self: center;
   width: min(100%, 380px);
-  padding: 20px 22px;
-  border: 1px solid color-mix(in srgb, var(--stroke) 64%, transparent);
-  border-radius: 24px;
-  background: color-mix(in srgb, var(--bg-elevated) 76%, transparent);
+  padding: 6px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   text-align: center;
 }
 
@@ -2225,18 +2220,21 @@ body[data-theme="dark"] .tg-chat-shell {
 
 .tg-bubble {
   max-width: min(72%, 620px);
-  padding: 12px 15px 10px;
-  border-radius: 22px;
+  padding: 10px 0 8px;
+  border-radius: 0;
   line-height: 1.55;
   white-space: pre-wrap;
-  border: 1px solid transparent;
+  border-top: 1px solid transparent;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
 }
 
 .tg-bubble-image {
   display: block;
   width: min(320px, 100%);
   max-width: 100%;
-  border-radius: 14px;
+  border-radius: 0;
   object-fit: cover;
 }
 
@@ -2244,12 +2242,12 @@ body[data-theme="dark"] .tg-chat-shell {
   display: block;
   width: min(360px, 100%);
   max-width: 100%;
-  border-radius: 14px;
+  border-radius: 0;
   background: #000;
 }
 
 .tg-bubble-sticker-shell {
-  padding: 10px 12px;
+  padding: 8px 0;
 }
 
 .tg-sticker-bubble {
@@ -2262,19 +2260,19 @@ body[data-theme="dark"] .tg-chat-shell {
 }
 
 .tg-bubble-in {
-  border-top-left-radius: 10px;
-  border-color: color-mix(in srgb, var(--stroke) 56%, transparent);
-  background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  border-top-left-radius: 0;
+  border-color: color-mix(in srgb, var(--stroke) 24%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .tg-bubble-out {
   align-self: flex-end;
-  border-top-right-radius: 10px;
-  border-color: color-mix(in srgb, var(--metal) 36%, transparent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--metal) 90%, white), color-mix(in srgb, var(--metal) 78%, #c59510));
+  border-top-right-radius: 0;
+  border-color: color-mix(in srgb, var(--metal) 24%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--metal) 66%, transparent), color-mix(in srgb, var(--metal-soft) 40%, transparent));
   color: #251b04;
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--metal-soft) 44%, transparent);
+  box-shadow: none;
 }
 
 .tg-bubble-meta {
@@ -2289,6 +2287,45 @@ body[data-theme="dark"] .tg-chat-shell {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.tg-context-menu {
+  position: fixed;
+  z-index: 130;
+  display: flex;
+  min-width: 180px;
+  flex-direction: column;
+  padding: 6px 0;
+  border-top: 1px solid color-mix(in srgb, var(--stroke-strong) 64%, transparent);
+  border-right: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--stroke-strong) 64%, transparent);
+  border-left: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  box-shadow: none;
+  backdrop-filter: blur(10px);
+}
+
+.tg-context-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-weight: 600;
+}
+
+.tg-context-item:hover {
+  background: color-mix(in srgb, var(--bg-muted) 52%, transparent);
+}
+
+.tg-context-item-danger {
+  color: #ef4444;
 }
 
 .tg-bubble-delete {
@@ -2326,11 +2363,11 @@ body[data-theme="dark"] .tg-chat-shell {
   right: 18px;
   display: inline-flex;
   align-items: center;
-  height: 40px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #fff;
   font-weight: 600;
 }
@@ -2347,7 +2384,7 @@ body[data-theme="dark"] .tg-chat-shell {
 .tg-media-viewer-video {
   max-width: 100%;
   max-height: calc(100dvh - 120px);
-  border-radius: 24px;
+  border-radius: 0;
   object-fit: contain;
   background: #02060e;
 }
@@ -2358,19 +2395,20 @@ body[data-theme="dark"] .tg-chat-shell {
   gap: 10px;
   align-items: end;
   padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
-  border-top: 1px solid color-mix(in srgb, var(--stroke) 64%, transparent);
-  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
-  backdrop-filter: blur(22px);
+  border-top: 1px solid color-mix(in srgb, var(--stroke) 42%, transparent);
+  background: transparent;
+  backdrop-filter: none;
   position: relative;
 }
 
 .tg-chat-compose textarea {
   min-height: 48px;
   max-height: 160px;
-  padding: 13px 16px;
-  border: 1px solid color-mix(in srgb, var(--stroke) 58%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--bg-muted) 94%, transparent);
+  padding: 12px 0;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--stroke) 44%, transparent);
+  background: transparent;
   box-shadow: none;
 }
 
@@ -2389,16 +2427,16 @@ body[data-theme="dark"] .tg-chat-shell {
 
 .tg-compose-icon {
   width: 46px;
-  border: 1px solid color-mix(in srgb, var(--stroke) 56%, transparent);
-  background: color-mix(in srgb, var(--bg-muted) 92%, transparent);
-  color: var(--text);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
   font-size: 1.3rem;
 }
 
 .tg-compose-icon-active {
-  border-color: color-mix(in srgb, var(--metal) 42%, transparent);
-  background: color-mix(in srgb, var(--metal-soft) 72%, var(--bg-muted));
-  color: #251b04;
+  border: 0;
+  background: transparent;
+  color: var(--metal);
 }
 
 .tg-compose-send {
@@ -2562,6 +2600,102 @@ body[data-theme="dark"] .tg-chat-shell {
   margin: 0 !important;
 }
 
+.profile-flat-page {
+  gap: 24px;
+}
+
+.profile-flat-page .reference-sheet-top {
+  padding: 0;
+}
+
+.profile-flat-page .reference-action-row,
+.profile-flat-page .reference-form-grid,
+.profile-flat-page .reference-sheet-message {
+  margin: 0;
+}
+
+.profile-flat-page .reference-form-grid,
+.profile-flat-page .reference-action-row {
+  padding: 0;
+}
+
+.profile-flat-page .reference-sheet-message {
+  padding: 8px 0 0;
+}
+
+.title-badge {
+  padding: 7px 14px;
+  border-width: 1px;
+  box-shadow: none;
+}
+
+.title-badge-compact {
+  padding: 6px 12px;
+}
+
+.title-badge-copy strong {
+  font-size: 0.92rem;
+  letter-spacing: 0.01em;
+}
+
+.title-badge-tooltip {
+  padding: 12px 0 10px;
+  border-top: 1px solid color-mix(in srgb, var(--stroke-strong) 66%, transparent);
+  border-right: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--stroke-strong) 66%, transparent);
+  border-left: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  box-shadow: none;
+  backdrop-filter: blur(10px);
+}
+
+.title-switcher {
+  gap: 8px;
+}
+
+.title-switcher-item .title-badge {
+  opacity: 0.68;
+}
+
+.directory-card-score {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--metal) 62%, var(--text));
+  box-shadow: none;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.directory-entry-reasons {
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
+}
+
+.discover-plain-block .panel-title,
+.directory-entry-reasons .panel-title {
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 980px) {
+  .profile-flat-page {
+    gap: 18px;
+  }
+
+  .profile-flat-page .reference-profile-left {
+    position: static;
+    top: auto;
+  }
+
+  .profile-flat-page .reference-profile-hero {
+    gap: 16px;
+  }
+}
+
 .panel,
 .nav-drawer,
 .session-box,
@@ -2684,17 +2818,20 @@ body[data-theme="dark"] .tg-chat-shell {
   width: min(280px, calc(100vw - 32px));
   flex-direction: column;
   gap: 6px;
-  padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--metal) 40%, var(--stroke-strong));
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--bg-elevated) 98%, transparent);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.16);
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in srgb, var(--metal) 40%, var(--stroke-strong));
+  border-right: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--metal) 40%, var(--stroke-strong));
+  border-left: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
+  box-shadow: none;
   color: var(--text);
   opacity: 0;
   pointer-events: none;
   transform: translateX(-50%) translateY(6px);
   transition: opacity 0.16s ease, transform 0.16s ease;
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(10px);
 }
 
 .title-badge-tooltip strong,
@@ -3224,21 +3361,24 @@ body[data-theme="dark"] .tg-chat-shell {
 .reference-meta-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 24px;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-muted) 86%, transparent);
-  color: var(--text);
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
 }
 
 .reference-status-line,
 .reference-sheet-message {
   margin: 0 20px 20px;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--stroke-strong));
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--bg-muted) 90%, transparent);
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 24%, var(--stroke-strong));
+  border-right: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 24%, var(--stroke-strong));
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
 }
 
@@ -3621,23 +3761,20 @@ body[data-theme="dark"] .tg-chat-shell {
 .nav-trigger {
   top: calc(16px + env(safe-area-inset-top));
   left: 16px;
-  width: 44px;
-  height: 44px;
-  padding: 0 11px;
+  width: 28px;
+  height: auto;
+  padding: 8px 0;
   gap: 4px;
-  border: 1px solid color-mix(in srgb, var(--stroke-strong) 92%, transparent);
-  border-radius: 15px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent),
-    color-mix(in srgb, var(--bg-elevated) 94%, transparent);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(18px);
-  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  transition: transform 0.16s ease;
 }
 
 .nav-trigger:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--metal) 46%, var(--stroke-strong));
 }
 
 .page-section {
@@ -3805,10 +3942,11 @@ body[data-theme="dark"] .tg-chat-shell {
 .modern-menu-close {
   min-width: 108px;
   min-height: 44px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--stroke-strong) 82%, transparent);
-  background: color-mix(in srgb, var(--bg-muted) 92%, transparent);
-  color: var(--text);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
   font-weight: 600;
 }
 
@@ -3823,18 +3961,19 @@ body[data-theme="dark"] .tg-chat-shell {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--stroke-strong) 82%, transparent);
-  border-radius: 22px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
-    color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+  padding: 16px 0;
+  border-top: 1px solid color-mix(in srgb, var(--stroke-strong) 46%, transparent);
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
   transition: transform 0.16s ease, border-color 0.16s ease;
 }
 
 .modern-menu-link:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--metal) 42%, var(--stroke-strong));
+  border-color: color-mix(in srgb, var(--metal) 26%, var(--stroke-strong));
 }
 
 .modern-menu-link-copy {
@@ -3881,10 +4020,8 @@ body[data-theme="dark"] .tg-chat-shell {
 }
 
 .reference-sheet-message {
-  border-radius: 20px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
-    color-mix(in srgb, var(--bg-muted) 92%, transparent);
+  border-radius: 0;
+  background: transparent;
 }
 
 .reference-form-grid {
@@ -3892,12 +4029,13 @@ body[data-theme="dark"] .tg-chat-shell {
 }
 
 .reference-form-column {
-  padding: 18px 20px;
-  border: 1px solid color-mix(in srgb, var(--stroke-strong) 82%, transparent);
-  border-radius: 28px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
-    color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in srgb, var(--stroke-strong) 34%, transparent);
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .button-primary {
@@ -3936,9 +4074,9 @@ body[data-theme="dark"] .tg-chat-shell {
   .nav-trigger {
     top: calc(10px + env(safe-area-inset-top));
     left: 12px;
-    width: 40px;
-    height: 40px;
-    padding: 0 10px;
+    width: 24px;
+    height: auto;
+    padding: 6px 0;
   }
 
   .modern-chat-row {
@@ -4191,6 +4329,10 @@ body[data-theme="dark"] .tg-chat-shell {
 
   .tg-media-viewer {
     padding: 14px;
+  }
+
+  .tg-context-menu {
+    min-width: 164px;
   }
 
   .tg-media-viewer-surface {

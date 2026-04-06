@@ -126,10 +126,7 @@ export function normalizeTitles(rawTitles: unknown): UserTitle[] {
   return Array.from(unique.values());
 }
 
-export function resolveActiveTitle(
-  titles: UserTitle[],
-  activeTitleId: string | null | undefined
-): UserTitle {
+export function resolveActiveTitle(titles: UserTitle[], activeTitleId: string | null | undefined): UserTitle {
   return titles.find((title) => title.id === activeTitleId) ?? titles[0] ?? makeRegistrationTitle();
 }
 
@@ -159,10 +156,7 @@ export function getTitleWidgetMeta(title: UserTitle) {
   };
 }
 
-export function resolveAccessProfile(
-  profile: UserProfile | null,
-  sessionUserId?: string | null
-): UserAccessProfile {
+export function resolveAccessProfile(profile: UserProfile | null, sessionUserId?: string | null): UserAccessProfile {
   const emperor = isEmperorProfile(profile, sessionUserId);
   const capabilities = [...new Set(profile?.capabilityFlags ?? [])] as Capability[];
   const isAdmin = emperor || capabilities.includes("title_grantor") || capabilities.includes("ban_hammer");

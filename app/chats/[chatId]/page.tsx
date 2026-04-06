@@ -3,7 +3,17 @@
 import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { type ChangeEvent, type FormEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { UserAvatar } from "@/components/user-avatar";
@@ -25,6 +35,16 @@ type MediaPreviewState =
   | { url: string; type: "image" | "video" }
   | null;
 
+type ContextMenuState = {
+  messageId: string;
+  sender: "me" | "them";
+  x: number;
+  y: number;
+  text: string;
+  type: ChatMessage["type"];
+  mediaUrl: string | null;
+};
+
 function formatMessageTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -37,7 +57,7 @@ function formatMessageTime(value: string) {
   }).format(date);
 }
 
-function handleMediaKeyDown(event: KeyboardEvent<HTMLDivElement>, openPreview: () => void) {
+function handleMediaKeyDown(event: ReactKeyboardEvent<HTMLDivElement>, openPreview: () => void) {
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
     openPreview();
@@ -49,6 +69,7 @@ export default function ChatPage() {
   const chatId = typeof params.chatId === "string" ? params.chatId : "";
   const { loading, session, supabase } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [friend, setFriend] = useState<FriendRecord | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -59,6 +80,7 @@ export default function ChatPage() {
   const [stickersOpen, setStickersOpen] = useState(false);
   const [deletingMessageId, setDeletingMessageId] = useState("");
   const [preview, setPreview] = useState<MediaPreviewState>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   useEffect(() => {
     if (!session || !chatId) {
@@ -128,6 +150,42 @@ export default function ChatPage() {
       void supabase.removeChannel(channel);
     };
   }, [chatId, session, supabase]);
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return;
+    }
+
+    function closeMenu() {
+      setContextMenu(null);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeMenu();
+      }
+    }
+
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("contextmenu", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("contextmenu", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contextMenu]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
 
   const canSend = useMemo(() => draft.trim().length > 0 && !uploadingMedia, [draft, uploadingMedia]);
 
@@ -210,8 +268,81 @@ export default function ChatPage() {
     }
   }
 
+  async function handleCopyFromMenu() {
+    if (!contextMenu) {
+      return;
+    }
+
+    const copyValue = contextMenu.type === "text" || contextMenu.type === "sticker"
+      ? contextMenu.text
+      : contextMenu.mediaUrl ?? "";
+
+    if (!copyValue) {
+      setContextMenu(null);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(copyValue);
+      setMessage("Скопировано.");
+    } catch {
+      setMessage("Не удалось скопировать.");
+    } finally {
+      setContextMenu(null);
+    }
+  }
+
+  async function handleDeleteFromMenu() {
+    if (!contextMenu || contextMenu.sender !== "me") {
+      return;
+    }
+
+    setContextMenu(null);
+    await handleDeleteMessage(contextMenu.messageId);
+  }
+
   function openFilePicker() {
     fileInputRef.current?.click();
+  }
+
+  function openContextMenuAt(x: number, y: number, item: ChatMessage) {
+    setContextMenu({
+      messageId: item.id,
+      sender: item.sender,
+      x,
+      y,
+      text: item.text,
+      type: item.type,
+      mediaUrl: item.mediaUrl
+    });
+  }
+
+  function openContextMenu(event: ReactMouseEvent<HTMLDivElement>, item: ChatMessage) {
+    event.preventDefault();
+    openContextMenuAt(event.clientX, event.clientY, item);
+  }
+
+  function handleTouchStart(event: ReactTouchEvent<HTMLDivElement>, item: ChatMessage) {
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    longPressTimerRef.current = setTimeout(() => {
+      openContextMenuAt(touch.clientX, touch.clientY, item);
+      longPressTimerRef.current = null;
+    }, 420);
+  }
+
+  function clearLongPress() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
   }
 
   if (!session && !loading) {
@@ -289,6 +420,24 @@ export default function ChatPage() {
         </div>
       ) : null}
 
+      {contextMenu ? (
+        <div className="tg-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+          <button className="tg-context-item" onClick={() => void handleCopyFromMenu()} type="button">
+            Копировать
+          </button>
+          {contextMenu.sender === "me" ? (
+            <button
+              className="tg-context-item tg-context-item-danger"
+              disabled={deletingMessageId === contextMenu.messageId}
+              onClick={() => void handleDeleteFromMenu()}
+              type="button"
+            >
+              {deletingMessageId === contextMenu.messageId ? "Удаляем..." : "Удалить"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <section className="tg-chat-shell">
         <div className="tg-chatbar">
           <div className="tg-chatbar-main">
@@ -326,6 +475,10 @@ export default function ChatPage() {
               <div
                 key={item.id}
                 className={`tg-bubble ${item.sender === "me" ? "tg-bubble-out" : "tg-bubble-in"} ${item.type === "sticker" ? "tg-bubble-sticker-shell" : ""}`}
+                onContextMenu={(event) => openContextMenu(event, item)}
+                onTouchCancel={clearLongPress}
+                onTouchEnd={clearLongPress}
+                onTouchStart={(event) => handleTouchStart(event, item)}
               >
                 {item.type === "image" && item.mediaUrl ? (
                   <div
@@ -364,16 +517,6 @@ export default function ChatPage() {
 
                 <div className="tg-bubble-footer">
                   <div className="tg-bubble-meta">{formatMessageTime(item.sentAt)}</div>
-                  {item.sender === "me" ? (
-                    <button
-                      className="tg-bubble-delete"
-                      disabled={deletingMessageId === item.id}
-                      onClick={() => void handleDeleteMessage(item.id)}
-                      type="button"
-                    >
-                      {deletingMessageId === item.id ? "..." : "Удалить"}
-                    </button>
-                  ) : null}
                 </div>
               </div>
             ))

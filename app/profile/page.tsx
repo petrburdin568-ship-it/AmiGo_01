@@ -147,7 +147,7 @@ export default function ProfilePage() {
   if (!session) {
     return (
       <AppShell mode="plain" title="Профиль" description="">
-        <section className="reference-sheet stack-lg">
+        <section className="stack-lg">
           <div className="reference-sheet-top">
             <button className="reference-brand-button" onClick={handleBrandTap} type="button">
               AmiGo
@@ -164,7 +164,7 @@ export default function ProfilePage() {
   if (!form) {
     return (
       <AppShell mode="plain" title="Профиль" description="">
-        <section className="reference-sheet stack-lg">
+        <section className="stack-lg">
           <div className="reference-sheet-top">
             <button className="reference-brand-button" onClick={handleBrandTap} type="button">
               AmiGo
@@ -181,11 +181,15 @@ export default function ProfilePage() {
   return (
     <>
       <AppShell mode="plain" title="Профиль" description="">
-        <section className="reference-sheet profile-sheet stack-xl">
+        <section className="profile-flat-page stack-xl">
           <div className="reference-sheet-top">
             <button className="reference-brand-button" onClick={handleBrandTap} type="button">
               AmiGo
             </button>
+          </div>
+
+          <div className="screen-heading-row">
+            <h1 className="reference-sheet-heading">Профиль</h1>
           </div>
 
           <div className="reference-profile-hero reference-profile-hero-sheet profile-mobile-hero">
@@ -198,13 +202,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="reference-profile-right profile-mobile-right">
-              <div className="screen-heading-row screen-heading-row-compact">
-                <div className="stack-xs">
-                  <h1 className="reference-sheet-heading">Профиль</h1>
-                </div>
-              </div>
-
+            <div className="reference-profile-right profile-mobile-right stack-md">
               <div className="profile-main-title">
                 <TitleBadge title={form.activeTitle} />
               </div>
@@ -274,6 +272,7 @@ export default function ProfilePage() {
                 <input
                   id="interest-search"
                   onChange={(event) => setInterestQuery(event.target.value)}
+                  placeholder="Найти интерес"
                   value={interestQuery}
                 />
               </div>
