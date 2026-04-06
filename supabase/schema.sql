@@ -509,6 +509,16 @@ create table if not exists public.friendships (
 create index if not exists friendships_user_one_idx on public.friendships (user_one);
 create index if not exists friendships_user_two_idx on public.friendships (user_two);
 
+create table if not exists public.friendship_members (
+  friendship_id uuid not null references public.friendships (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  last_read_at timestamptz,
+  created_at timestamptz not null default timezone('utc', now()),
+  primary key (friendship_id, user_id)
+);
+
+create index if not exists friendship_members_user_idx on public.friendship_members (user_id, friendship_id);
+
 create table if not exists public.friend_requests (
   id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references auth.users (id) on delete cascade,
@@ -528,20 +538,22 @@ create table if not exists public.messages (
   friendship_id uuid not null references public.friendships (id) on delete cascade,
   sender_id uuid not null references auth.users (id) on delete cascade,
   body text not null check (char_length(trim(body)) > 0),
-  message_type text not null default 'text' check (message_type in ('text', 'image', 'video', 'sticker')),
+  message_type text not null default 'text' check (message_type in ('text', 'image', 'video', 'sticker', 'voice', 'video-note')),
   media_url text,
   media_path text,
+  reply_to_message_id uuid references public.messages (id) on delete set null,
   created_at timestamptz not null default timezone('utc', now())
 );
 
 alter table public.messages add column if not exists message_type text;
 alter table public.messages add column if not exists media_url text;
 alter table public.messages add column if not exists media_path text;
+alter table public.messages add column if not exists reply_to_message_id uuid references public.messages (id) on delete set null;
 alter table public.messages alter column message_type set default 'text';
 update public.messages set message_type = 'text' where message_type is null;
 alter table public.messages alter column message_type set not null;
 alter table public.messages drop constraint if exists messages_message_type_check;
-alter table public.messages add constraint messages_message_type_check check (message_type in ('text', 'image', 'video', 'sticker'));
+alter table public.messages add constraint messages_message_type_check check (message_type in ('text', 'image', 'video', 'sticker', 'voice', 'video-note'));
 alter table public.profiles drop constraint if exists profiles_age_check;
 alter table public.profiles add constraint profiles_age_check check (age between 0 and 120);
 
@@ -550,6 +562,7 @@ create index if not exists messages_friendship_created_at_idx
 
 alter table public.profiles enable row level security;
 alter table public.friendships enable row level security;
+alter table public.friendship_members enable row level security;
 alter table public.friend_requests enable row level security;
 alter table public.messages enable row level security;
 
@@ -580,6 +593,37 @@ create trigger friend_requests_set_updated_at
 before update on public.friend_requests
 for each row
 execute function public.set_updated_at();
+
+create or replace function public.seed_friendship_members()
+returns trigger
+language plpgsql
+as $$
+begin
+  insert into public.friendship_members (friendship_id, user_id, last_read_at)
+  values
+    (new.id, new.user_one, timezone('utc', now())),
+    (new.id, new.user_two, timezone('utc', now()))
+  on conflict (friendship_id, user_id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists friendships_seed_members on public.friendships;
+create trigger friendships_seed_members
+after insert on public.friendships
+for each row
+execute function public.seed_friendship_members();
+
+insert into public.friendship_members (friendship_id, user_id, last_read_at)
+select id, user_one, created_at
+from public.friendships
+on conflict (friendship_id, user_id) do nothing;
+
+insert into public.friendship_members (friendship_id, user_id, last_read_at)
+select id, user_two, created_at
+from public.friendships
+on conflict (friendship_id, user_id) do nothing;
 
 create or replace function public.set_custom_title(
   target_user uuid,
@@ -1135,6 +1179,35 @@ $$;
 grant execute on function public.request_friendship(uuid) to authenticated;
 grant execute on function public.accept_friend_request(uuid) to authenticated;
 
+create or replace function public.mark_friendship_read(target_friendship uuid)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor uuid := auth.uid();
+  timestamp_value timestamptz := timezone('utc', now());
+begin
+  if actor is null then
+    raise exception 'Authentication required.';
+  end if;
+
+  update public.friendship_members
+  set last_read_at = timestamp_value
+  where friendship_id = target_friendship
+    and user_id = actor;
+
+  if not found then
+    raise exception 'Friendship membership not found.';
+  end if;
+
+  return timestamp_value;
+end;
+$$;
+
+grant execute on function public.mark_friendship_read(uuid) to authenticated;
+
 drop policy if exists "friend_requests_select_members" on public.friend_requests;
 create policy "friend_requests_select_members"
 on public.friend_requests
@@ -1148,6 +1221,21 @@ on public.friendships
 for select
 to authenticated
 using (auth.uid() = user_one or auth.uid() = user_two);
+
+drop policy if exists "friendship_members_select_own" on public.friendship_members;
+create policy "friendship_members_select_own"
+on public.friendship_members
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+drop policy if exists "friendship_members_update_own" on public.friendship_members;
+create policy "friendship_members_update_own"
+on public.friendship_members
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
 
 drop policy if exists "messages_select_members" on public.messages;
 create policy "messages_select_members"

@@ -45,14 +45,21 @@ export type FriendshipRow = {
   created_at: string;
 };
 
+export type FriendshipMemberRow = {
+  friendship_id: string;
+  user_id: string;
+  last_read_at: string | null;
+};
+
 export type MessageRow = {
   id: string;
   friendship_id: string;
   sender_id: string;
   body: string;
-  message_type: "text" | "image" | "video" | "sticker";
+  message_type: "text" | "image" | "video" | "sticker" | "voice" | "video-note";
   media_url: string | null;
   media_path: string | null;
+  reply_to_message_id: string | null;
   created_at: string;
 };
 
@@ -136,12 +143,16 @@ export function profileToUpsertRow(profile: UserProfile) {
 
 export function mapFriendRecord(
   friendship: FriendshipRow,
-  profile: UserProfile
+  profile: UserProfile,
+  state?: Partial<Pick<FriendRecord, "unreadCount" | "lastReadAt" | "lastMessage">>
 ): FriendRecord {
   return {
     friendshipId: friendship.id,
     profile,
-    createdAt: friendship.created_at
+    createdAt: friendship.created_at,
+    unreadCount: state?.unreadCount ?? 0,
+    lastReadAt: state?.lastReadAt ?? null,
+    lastMessage: state?.lastMessage ?? null
   };
 }
 
@@ -166,6 +177,8 @@ export function mapMessageRow(row: MessageRow, currentUserId: string): ChatMessa
     type: row.message_type ?? "text",
     text: row.body,
     mediaUrl: row.media_url,
-    sentAt: row.created_at
+    sentAt: row.created_at,
+    replyToMessageId: row.reply_to_message_id,
+    replyPreview: null
   };
 }

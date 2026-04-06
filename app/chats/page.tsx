@@ -1,13 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { useLanguage } from "@/components/language-provider";
 import { UserAvatar } from "@/components/user-avatar";
 import { listFriends } from "@/lib/supabase/queries";
-import type { FriendRecord } from "@/lib/types";
+import type { ChatMessageType, FriendRecord } from "@/lib/types";
+
+function getChatPreview(type: ChatMessageType, text: string, language: "ru" | "en") {
+  if (type === "image") {
+    return language === "ru" ? "Фотография" : "Photo";
+  }
+
+  if (type === "video") {
+    return language === "ru" ? "Видео" : "Video";
+  }
+
+  if (type === "sticker") {
+    return language === "ru" ? "Стикер" : "Sticker";
+  }
+
+  if (type === "voice") {
+    return language === "ru" ? "Голосовое" : "Voice message";
+  }
+
+  if (type === "video-note") {
+    return language === "ru" ? "Кружок" : "Video note";
+  }
+
+  return text;
+}
 
 export default function ChatsPage() {
   const { loading, session, supabase } = useAuth();
@@ -29,7 +53,9 @@ export default function ChatsPage() {
           loadError: "Не удалось загрузить чаты.",
           inbox: "Твои диалоги",
           hint: "Все активные переписки в одном месте.",
-          locale: "ru-RU"
+          you: "Ты: ",
+          unread: "Новых",
+          locale: "ru-RU" as const
         }
       : {
           title: "Chats",
@@ -43,7 +69,9 @@ export default function ChatsPage() {
           loadError: "Failed to load chats.",
           inbox: "Your conversations",
           hint: "All active conversations in one place.",
-          locale: "en-US"
+          you: "You: ",
+          unread: "New",
+          locale: "en-US" as const
         };
 
   useEffect(() => {
@@ -55,7 +83,7 @@ export default function ChatsPage() {
     const currentUserId = session.user.id;
     let active = true;
 
-    async function loadFriends() {
+    async function loadFriendsList() {
       try {
         const friendList = await listFriends(supabase, currentUserId);
         if (active) {
@@ -68,16 +96,32 @@ export default function ChatsPage() {
       }
     }
 
-    void loadFriends();
+    void loadFriendsList();
+
+    const channel = supabase
+      .channel(`chat-list:${currentUserId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, () => {
+        void loadFriendsList();
+      })
+      .subscribe();
 
     return () => {
       active = false;
+      void supabase.removeChannel(channel);
     };
   }, [copy.loadError, session, supabase]);
 
+  const sortedFriends = useMemo(() => {
+    return [...friends].sort((left, right) => {
+      const leftDate = left.lastMessage?.sentAt ?? left.createdAt;
+      const rightDate = right.lastMessage?.sentAt ?? right.createdAt;
+      return rightDate.localeCompare(leftDate);
+    });
+  }, [friends]);
+
   if (!session && !loading) {
     return (
-      <AppShell mode="plain" title={copy.title} description="">
+      <AppShell description="" mode="plain" title={copy.title}>
         <section className="tg-home">
           <header className="tg-home-header">
             <div className="tg-home-header-copy">
@@ -99,7 +143,7 @@ export default function ChatsPage() {
   }
 
   return (
-    <AppShell mode="plain" title={copy.title} description="">
+    <AppShell description="" mode="plain" title={copy.title}>
       <section className="tg-home">
         <header className="tg-home-header">
           <div className="tg-home-header-copy">
@@ -109,7 +153,7 @@ export default function ChatsPage() {
 
           <div className="modern-meta-pills">
             <span className="reference-meta-pill modern-meta-pill">
-              {friends.length} {copy.dialogs}
+              {sortedFriends.length} {copy.dialogs}
             </span>
           </div>
         </header>
@@ -117,32 +161,50 @@ export default function ChatsPage() {
         {message ? <div className="reference-sheet-message">{message}</div> : null}
 
         <div className="tg-list-panel">
-          {friends.length === 0 ? (
+          {sortedFriends.length === 0 ? (
             <div className="tg-empty-screen">
               <h2>{copy.inbox}</h2>
               <p>{copy.empty}</p>
             </div>
           ) : (
             <div className="tg-dialog-list">
-              {friends.map((friend) => (
-                <article key={friend.friendshipId} className="tg-dialog-row">
-                  <Link className="tg-dialog-avatar" href={`/friends/${friend.friendshipId}`}>
-                    <UserAvatar name={friend.profile.name} size="sm" src={friend.profile.avatar} />
-                  </Link>
+              {sortedFriends.map((friend) => {
+                const preview = friend.lastMessage
+                  ? `${friend.lastMessage.sender === "me" ? copy.you : ""}${getChatPreview(
+                      friend.lastMessage.type,
+                      friend.lastMessage.text,
+                      language
+                    )}`
+                  : friend.profile.bio || copy.chatReady;
 
-                  <Link className="tg-dialog-main" href={`/chats/${friend.friendshipId}`}>
-                    <div className="tg-dialog-top">
-                      <strong>{friend.profile.name}</strong>
-                      <span>{new Date(friend.createdAt).toLocaleDateString(copy.locale)}</span>
-                    </div>
-                    <p>{friend.profile.bio || copy.chatReady}</p>
-                  </Link>
+                return (
+                  <article key={friend.friendshipId} className="tg-dialog-row">
+                    <Link className="tg-dialog-avatar" href={`/friends/${friend.friendshipId}`}>
+                      <UserAvatar name={friend.profile.name} size="sm" src={friend.profile.avatar} />
+                    </Link>
 
-                  <Link className="tg-dialog-side" href={`/friends/${friend.friendshipId}`}>
-                    {copy.profile}
-                  </Link>
-                </article>
-              ))}
+                    <Link className="tg-dialog-main" href={`/chats/${friend.friendshipId}`}>
+                      <div className="tg-dialog-top">
+                        <strong>{friend.profile.name}</strong>
+                        <span>{new Date(friend.lastMessage?.sentAt ?? friend.createdAt).toLocaleDateString(copy.locale)}</span>
+                      </div>
+
+                      <div className="tg-dialog-bottom">
+                        <p className={friend.unreadCount > 0 ? "tg-dialog-preview-unread" : ""}>{preview}</p>
+                        {friend.unreadCount > 0 ? (
+                          <span className="tg-dialog-badge" aria-label={`${copy.unread}: ${friend.unreadCount}`}>
+                            {friend.unreadCount}
+                          </span>
+                        ) : null}
+                      </div>
+                    </Link>
+
+                    <Link className="tg-dialog-side" href={`/friends/${friend.friendshipId}`}>
+                      {copy.profile}
+                    </Link>
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>

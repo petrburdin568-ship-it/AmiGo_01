@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ChatMessage, FriendRecord, FriendRequestRecord, UserProfile } from "@/lib/types";
 import {
   type FriendRequestRow,
+  type FriendshipMemberRow,
   type FriendshipRow,
   type MessageRow,
   type ProfileRow,
@@ -15,11 +16,7 @@ import {
 } from "@/lib/supabase/types";
 
 export async function getProfileByUserId(supabase: SupabaseClient, userId: string) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .maybeSingle();
+  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
 
   if (error) {
     throw error;
@@ -31,11 +28,7 @@ export async function getProfileByUserId(supabase: SupabaseClient, userId: strin
 export async function upsertProfile(supabase: SupabaseClient, profile: UserProfile) {
   const row = profileToUpsertRow(profile);
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .upsert(row)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.from("profiles").upsert(row).select("*").single();
 
   if (error) {
     throw error;
@@ -44,10 +37,7 @@ export async function upsertProfile(supabase: SupabaseClient, profile: UserProfi
   return mapProfileRow(data as ProfileRow);
 }
 
-export async function setActiveProfileTitle(
-  supabase: SupabaseClient,
-  titleId: string
-) {
+export async function setActiveProfileTitle(supabase: SupabaseClient, titleId: string) {
   const { data, error } = await supabase.rpc("set_active_profile_title", {
     next_title_id: titleId
   });
@@ -105,11 +95,7 @@ export async function getProfileByAmigoId(supabase: SupabaseClient, amigoId: str
   return row ? mapPublicProfileRow(row as PublicProfileRow) : null;
 }
 
-export async function requestFriendship(
-  supabase: SupabaseClient,
-  currentUserId: string,
-  friendUserId: string
-) {
+export async function requestFriendship(supabase: SupabaseClient, currentUserId: string, friendUserId: string) {
   const { data, error } = await supabase.rpc("request_friendship", {
     target_user: friendUserId
   });
@@ -125,10 +111,7 @@ export async function requestFriendship(
   };
 }
 
-export async function acceptFriendRequest(
-  supabase: SupabaseClient,
-  requestId: string
-) {
+export async function acceptFriendRequest(supabase: SupabaseClient, requestId: string) {
   const { data, error } = await supabase.rpc("accept_friend_request", {
     target_request: requestId
   });
@@ -140,10 +123,7 @@ export async function acceptFriendRequest(
   return data as string;
 }
 
-export async function listFriendRequests(
-  supabase: SupabaseClient,
-  currentUserId: string
-) {
+export async function listFriendRequests(supabase: SupabaseClient, currentUserId: string) {
   const { data, error } = await supabase
     .from("friend_requests")
     .select("*")
@@ -161,9 +141,7 @@ export async function listFriendRequests(
     return [] as FriendRequestRecord[];
   }
 
-  const targetIds = requestRows.map((item) =>
-    item.requester_id === currentUserId ? item.recipient_id : item.requester_id
-  );
+  const targetIds = requestRows.map((item) => (item.requester_id === currentUserId ? item.recipient_id : item.requester_id));
 
   const { data: profiles, error: profilesError } = await supabase.rpc("get_directory_profiles_by_ids", {
     target_ids: targetIds
@@ -174,9 +152,7 @@ export async function listFriendRequests(
   }
 
   const profileRows = (profiles ?? []) as PublicProfileRow[];
-  const profileMap = new Map(
-    profileRows.map((profile) => [profile.id, mapPublicProfileRow(profile)])
-  );
+  const profileMap = new Map(profileRows.map((profile) => [profile.id, mapPublicProfileRow(profile)]));
 
   return requestRows
     .map((request) => {
@@ -186,11 +162,7 @@ export async function listFriendRequests(
         return null;
       }
 
-      return mapFriendRequestRecord(
-        request,
-        request.recipient_id === currentUserId ? "incoming" : "outgoing",
-        profile
-      );
+      return mapFriendRequestRecord(request, request.recipient_id === currentUserId ? "incoming" : "outgoing", profile);
     })
     .filter((item): item is FriendRequestRecord => item !== null);
 }
@@ -212,38 +184,79 @@ export async function listFriends(supabase: SupabaseClient, currentUserId: strin
     return [] as FriendRecord[];
   }
 
-  const friendIds = friendshipRows.map((item: FriendshipRow) =>
-    item.user_one === currentUserId ? item.user_two : item.user_one
-  );
+  const friendshipIds = friendshipRows.map((item) => item.id);
+  const friendIds = friendshipRows.map((item) => (item.user_one === currentUserId ? item.user_two : item.user_one));
 
-  const { data: profiles, error: profilesError } = await supabase
-    .rpc("get_directory_profiles_by_ids", {
-      target_ids: friendIds
-    });
+  const [{ data: profiles, error: profilesError }, { data: memberRows, error: membersError }, { data: messageRows, error: messagesError }] =
+    await Promise.all([
+      supabase.rpc("get_directory_profiles_by_ids", { target_ids: friendIds }),
+      supabase
+        .from("friendship_members")
+        .select("*")
+        .eq("user_id", currentUserId)
+        .in("friendship_id", friendshipIds),
+      supabase
+        .from("messages")
+        .select("*")
+        .in("friendship_id", friendshipIds)
+        .order("created_at", { ascending: false })
+    ]);
 
   if (profilesError) {
     throw profilesError;
   }
 
-  const profileRows = (profiles ?? []) as PublicProfileRow[];
-  const profileMap = new Map(
-    profileRows.map((profile: PublicProfileRow) => [profile.id, mapPublicProfileRow(profile)])
-  );
+  if (membersError) {
+    throw membersError;
+  }
+
+  if (messagesError) {
+    throw messagesError;
+  }
+
+  const profileMap = new Map(((profiles ?? []) as PublicProfileRow[]).map((profile) => [profile.id, mapPublicProfileRow(profile)]));
+  const memberMap = new Map(((memberRows ?? []) as FriendshipMemberRow[]).map((item) => [item.friendship_id, item]));
+  const messagesByFriendship = new Map<string, MessageRow[]>();
+
+  for (const row of (messageRows ?? []) as MessageRow[]) {
+    const current = messagesByFriendship.get(row.friendship_id) ?? [];
+    current.push(row);
+    messagesByFriendship.set(row.friendship_id, current);
+  }
 
   return friendshipRows
-    .map((friendship: FriendshipRow) => {
+    .map((friendship) => {
       const friendId = friendship.user_one === currentUserId ? friendship.user_two : friendship.user_one;
       const profile = profileMap.get(friendId);
-      return profile ? mapFriendRecord(friendship, profile) : null;
+      if (!profile) {
+        return null;
+      }
+
+      const memberState = memberMap.get(friendship.id);
+      const rows = messagesByFriendship.get(friendship.id) ?? [];
+      const latest = rows[0];
+      const lastReadAt = memberState?.last_read_at ?? null;
+      const unreadCount = rows.filter((row) => row.sender_id !== currentUserId && (!lastReadAt || row.created_at > lastReadAt)).length;
+
+      return mapFriendRecord(friendship, profile, {
+        lastReadAt,
+        unreadCount,
+        lastMessage: latest
+          ? {
+              id: latest.id,
+              sender: latest.sender_id === currentUserId ? "me" : "them",
+              type: latest.message_type,
+              text: latest.body,
+              mediaUrl: latest.media_url,
+              sentAt: latest.created_at
+            }
+          : null
+      });
     })
     .filter((item: FriendRecord | null): item is FriendRecord => item !== null);
 }
 
-export async function getFriendshipDetails(
-  supabase: SupabaseClient,
-  currentUserId: string,
-  friendshipId: string
-) {
+export async function getFriendshipDetails(supabase: SupabaseClient, currentUserId: string, friendshipId: string) {
   const { data: friendship, error: friendshipError } = await supabase
     .from("friendships")
     .select("*")
@@ -260,19 +273,41 @@ export async function getFriendshipDetails(
     return null;
   }
 
-  const friendId =
-    friendshipRow.user_one === currentUserId ? friendshipRow.user_two : friendshipRow.user_one;
+  const friendId = friendshipRow.user_one === currentUserId ? friendshipRow.user_two : friendshipRow.user_one;
   if (!friendId || (friendshipRow.user_one !== currentUserId && friendshipRow.user_two !== currentUserId)) {
     return null;
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .rpc("get_directory_profiles_by_ids", {
-      target_ids: [friendId]
-    });
+  const [{ data: profile, error: profileError }, { data: memberState, error: memberError }, { data: latestMessage, error: latestMessageError }] =
+    await Promise.all([
+      supabase.rpc("get_directory_profiles_by_ids", {
+        target_ids: [friendId]
+      }),
+      supabase
+        .from("friendship_members")
+        .select("*")
+        .eq("friendship_id", friendshipId)
+        .eq("user_id", currentUserId)
+        .maybeSingle(),
+      supabase
+        .from("messages")
+        .select("*")
+        .eq("friendship_id", friendshipId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ]);
 
   if (profileError) {
     throw profileError;
+  }
+
+  if (memberError) {
+    throw memberError;
+  }
+
+  if (latestMessageError) {
+    throw latestMessageError;
   }
 
   const safeProfile = Array.isArray(profile) ? profile[0] : profile;
@@ -281,14 +316,48 @@ export async function getFriendshipDetails(
     return null;
   }
 
-  return mapFriendRecord(friendshipRow, mapPublicProfileRow(safeProfile as PublicProfileRow));
+  return mapFriendRecord(friendshipRow, mapPublicProfileRow(safeProfile as PublicProfileRow), {
+    lastReadAt: (memberState as FriendshipMemberRow | null)?.last_read_at ?? null,
+    unreadCount: 0,
+    lastMessage: latestMessage
+      ? {
+          id: (latestMessage as MessageRow).id,
+          sender: (latestMessage as MessageRow).sender_id === currentUserId ? "me" : "them",
+          type: (latestMessage as MessageRow).message_type,
+          text: (latestMessage as MessageRow).body,
+          mediaUrl: (latestMessage as MessageRow).media_url,
+          sentAt: (latestMessage as MessageRow).created_at
+        }
+      : null
+  });
 }
 
-export async function listMessages(
-  supabase: SupabaseClient,
-  friendshipId: string,
-  currentUserId: string
-) {
+function enrichReplies(messages: ChatMessage[]) {
+  const messageMap = new Map(messages.map((item) => [item.id, item]));
+
+  return messages.map((item) => ({
+    ...item,
+    replyPreview: item.replyToMessageId
+      ? (() => {
+          const replied = messageMap.get(item.replyToMessageId);
+          if (!replied) {
+            return null;
+          }
+
+          return {
+            id: replied.id,
+            sender: replied.sender,
+            type: replied.type,
+            text: replied.text,
+            mediaUrl: replied.mediaUrl,
+            sentAt: replied.sentAt
+          };
+        })()
+      : null
+  }));
+}
+
+export async function listMessages(supabase: SupabaseClient, friendshipId: string, currentUserId: string) {
   const { data, error } = await supabase
     .from("messages")
     .select("*")
@@ -299,14 +368,19 @@ export async function listMessages(
     throw error;
   }
 
-  return ((data ?? []) as MessageRow[]).map((row: MessageRow) => mapMessageRow(row, currentUserId));
+  return enrichReplies(((data ?? []) as MessageRow[]).map((row) => mapMessageRow(row, currentUserId)));
 }
+
+type SendMessageOptions = {
+  replyToMessageId?: string | null;
+};
 
 export async function sendMessage(
   supabase: SupabaseClient,
   friendshipId: string,
   senderId: string,
-  text: string
+  text: string,
+  options: SendMessageOptions = {}
 ) {
   const { error } = await supabase.from("messages").insert({
     friendship_id: friendshipId,
@@ -314,7 +388,8 @@ export async function sendMessage(
     body: text.trim(),
     message_type: "text",
     media_url: null,
-    media_path: null
+    media_path: null,
+    reply_to_message_id: options.replyToMessageId ?? null
   });
 
   if (error) {
@@ -326,7 +401,8 @@ export async function sendStickerMessage(
   supabase: SupabaseClient,
   friendshipId: string,
   senderId: string,
-  sticker: string
+  sticker: string,
+  options: SendMessageOptions = {}
 ) {
   const { error } = await supabase.from("messages").insert({
     friendship_id: friendshipId,
@@ -334,7 +410,8 @@ export async function sendStickerMessage(
     body: sticker,
     message_type: "sticker",
     media_url: null,
-    media_path: null
+    media_path: null,
+    reply_to_message_id: options.replyToMessageId ?? null
   });
 
   if (error) {
@@ -342,10 +419,40 @@ export async function sendStickerMessage(
   }
 }
 
-function buildChatImagePath(friendshipId: string, senderId: string, file: File) {
-  const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : undefined;
-  const safeExtension = extension && extension.length <= 8 ? extension.replace(/[^a-z0-9]/g, "") : "jpg";
-  return `${friendshipId}/${senderId}/${Date.now()}-${crypto.randomUUID()}.${safeExtension || "jpg"}`;
+function inferMediaExtension(type: "image" | "video" | "voice" | "video-note", file: File) {
+  const originalExtension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : undefined;
+  const safeOriginal = originalExtension && originalExtension.length <= 8 ? originalExtension.replace(/[^a-z0-9]/g, "") : "";
+
+  if (safeOriginal) {
+    return safeOriginal;
+  }
+
+  if (type === "image") {
+    return "jpg";
+  }
+
+  if (file.type.includes("webm")) {
+    return "webm";
+  }
+
+  if (file.type.includes("ogg")) {
+    return "ogg";
+  }
+
+  if (file.type.includes("mp4")) {
+    return "mp4";
+  }
+
+  if (type === "voice") {
+    return "webm";
+  }
+
+  return "mp4";
+}
+
+function buildChatMediaPath(friendshipId: string, senderId: string, file: File, type: "image" | "video" | "voice" | "video-note") {
+  const extension = inferMediaExtension(type, file);
+  return `${friendshipId}/${senderId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
 }
 
 async function sendMediaMessage(
@@ -353,14 +460,21 @@ async function sendMediaMessage(
   friendshipId: string,
   senderId: string,
   file: File,
-  type: "image" | "video"
+  type: "image" | "video" | "voice" | "video-note",
+  options: SendMessageOptions = {}
 ) {
-  const path = buildChatImagePath(friendshipId, senderId, file);
+  const path = buildChatMediaPath(friendshipId, senderId, file, type);
   const bucket = supabase.storage.from("chat-media");
+  const fallbackContentType =
+    type === "image"
+      ? "image/jpeg"
+      : type === "voice"
+        ? "audio/webm"
+        : "video/webm";
 
   const { error: uploadError } = await bucket.upload(path, file, {
     cacheControl: "3600",
-    contentType: file.type || (type === "video" ? "video/mp4" : "image/jpeg"),
+    contentType: file.type || fallbackContentType,
     upsert: false
   });
 
@@ -378,7 +492,8 @@ async function sendMediaMessage(
     body: type,
     message_type: type,
     media_url: publicUrl,
-    media_path: path
+    media_path: path,
+    reply_to_message_id: options.replyToMessageId ?? null
   });
 
   if (error) {
@@ -390,44 +505,67 @@ export async function sendImageMessage(
   supabase: SupabaseClient,
   friendshipId: string,
   senderId: string,
-  file: File
+  file: File,
+  options: SendMessageOptions = {}
 ) {
-  await sendMediaMessage(supabase, friendshipId, senderId, file, "image");
+  await sendMediaMessage(supabase, friendshipId, senderId, file, "image", options);
 }
 
 export async function sendVideoMessage(
   supabase: SupabaseClient,
   friendshipId: string,
   senderId: string,
-  file: File
+  file: File,
+  options: SendMessageOptions = {}
 ) {
-  await sendMediaMessage(supabase, friendshipId, senderId, file, "video");
+  await sendMediaMessage(supabase, friendshipId, senderId, file, "video", options);
 }
 
-export async function deleteOwnMessage(
+export async function sendVoiceMessage(
   supabase: SupabaseClient,
-  messageId: string
+  friendshipId: string,
+  senderId: string,
+  file: File,
+  options: SendMessageOptions = {}
 ) {
-  const { error } = await supabase
-    .from("messages")
-    .delete()
-    .eq("id", messageId);
+  await sendMediaMessage(supabase, friendshipId, senderId, file, "voice", options);
+}
+
+export async function sendVideoNoteMessage(
+  supabase: SupabaseClient,
+  friendshipId: string,
+  senderId: string,
+  file: File,
+  options: SendMessageOptions = {}
+) {
+  await sendMediaMessage(supabase, friendshipId, senderId, file, "video-note", options);
+}
+
+export async function markFriendshipRead(supabase: SupabaseClient, friendshipId: string) {
+  const { data, error } = await supabase.rpc("mark_friendship_read", {
+    target_friendship: friendshipId
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data as string;
+}
+
+export async function deleteOwnMessage(supabase: SupabaseClient, messageId: string) {
+  const { error } = await supabase.from("messages").delete().eq("id", messageId);
 
   if (error) {
     throw error;
   }
 }
 
-export function appendIncomingMessage(
-  current: ChatMessage[],
-  row: MessageRow,
-  currentUserId: string
-) {
+export function appendIncomingMessage(current: ChatMessage[], row: MessageRow, currentUserId: string) {
   if (current.some((item) => item.id === row.id)) {
     return current;
   }
 
-  return [...current, mapMessageRow(row, currentUserId)].sort((left, right) =>
-    left.sentAt.localeCompare(right.sentAt)
-  );
+  const next = [...current, mapMessageRow(row, currentUserId)].sort((left, right) => left.sentAt.localeCompare(right.sentAt));
+  return enrichReplies(next);
 }

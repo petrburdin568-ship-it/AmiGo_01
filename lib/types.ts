@@ -107,10 +107,31 @@ export type DirectoryResult = {
   reasons: string[];
 };
 
+export type ChatMessageType = "text" | "image" | "video" | "sticker" | "voice" | "video-note";
+
+export type ChatMessageReply = {
+  id: string;
+  sender: "me" | "them";
+  type: ChatMessageType;
+  text: string;
+  mediaUrl: string | null;
+  sentAt: string;
+};
+
 export type FriendRecord = {
   friendshipId: string;
   profile: UserProfile;
   createdAt: string;
+  unreadCount: number;
+  lastReadAt: string | null;
+  lastMessage: {
+    id: string;
+    sender: "me" | "them";
+    type: ChatMessageType;
+    text: string;
+    mediaUrl: string | null;
+    sentAt: string;
+  } | null;
 };
 
 export type FriendRequestDirection = "incoming" | "outgoing";
@@ -126,8 +147,10 @@ export type ChatMessage = {
   id: string;
   friendshipId: string;
   sender: "me" | "them";
-  type: "text" | "image" | "video" | "sticker";
+  type: ChatMessageType;
   text: string;
   mediaUrl: string | null;
   sentAt: string;
+  replyToMessageId: string | null;
+  replyPreview: ChatMessageReply | null;
 };
