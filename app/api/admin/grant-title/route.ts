@@ -67,13 +67,13 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     amigoId?: string;
     titleText?: string;
-    icon?: string;
+    reason?: string;
     tone?: TitleTone;
   };
 
   const amigoId = body.amigoId?.trim().toUpperCase();
   const titleText = body.titleText?.trim();
-  const icon = body.icon?.trim().toUpperCase() || "ADM";
+  const reason = body.reason?.trim() || "Выдан администратором вручную.";
   const tone = body.tone ?? "gold";
 
   if (!amigoId || !titleText) {
@@ -84,8 +84,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Титул слишком длинный." }, { status: 400 });
   }
 
-  if (icon.length > 6) {
-    return NextResponse.json({ ok: false, message: "Иконка слишком длинная." }, { status: 400 });
+  if (reason.length > 220) {
+    return NextResponse.json({ ok: false, message: "Описание титула слишком длинное." }, { status: 400 });
   }
 
   const adminClient = createClient(url, serviceRole, {
@@ -114,10 +114,12 @@ export async function POST(request: Request) {
     id: ADMIN_TITLE_ID,
     text: titleText,
     category: "admin",
-    icon,
+    icon: "ADM",
     tone,
     locked: true,
-    grantedBy: requesterId
+    grantedBy: requesterId,
+    description: reason,
+    acquiredAt: new Date().toISOString()
   };
 
   const nextTitles = [...titles.filter((title) => title.id !== ADMIN_TITLE_ID), nextAdminTitle];
@@ -148,6 +150,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    message: `Админский титул выдан пользователю ${target.name}.`
+    message: `Титул выдан пользователю ${target.name}.`
   });
 }

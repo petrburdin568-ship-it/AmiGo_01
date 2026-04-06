@@ -7,15 +7,15 @@ import type { TitleTone } from "@/lib/types";
 const toneOptions: Array<{ value: TitleTone; label: string }> = [
   { value: "gold", label: "Золото" },
   { value: "silver", label: "Серебро" },
-  { value: "cyan", label: "Ледяной" },
-  { value: "royal", label: "Имперский" }
+  { value: "cyan", label: "Лёд" },
+  { value: "royal", label: "Императорский" }
 ];
 
 export function AdminConsole() {
   const { access, session } = useAuth();
   const [amigoId, setAmigoId] = useState("");
   const [titleText, setTitleText] = useState("");
-  const [icon, setIcon] = useState("ADM");
+  const [reason, setReason] = useState("");
   const [tone, setTone] = useState<TitleTone>("gold");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -39,7 +39,7 @@ export function AdminConsole() {
         body: JSON.stringify({
           amigoId,
           titleText,
-          icon,
+          reason,
           tone
         })
       });
@@ -49,9 +49,10 @@ export function AdminConsole() {
         throw new Error(payload.message ?? "Не удалось выдать титул.");
       }
 
-      setMessage(payload.message ?? "Админский титул выдан.");
+      setMessage(payload.message ?? "Титул выдан.");
       setAmigoId("");
       setTitleText("");
+      setReason("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Не удалось выдать титул.");
     } finally {
@@ -68,7 +69,7 @@ export function AdminConsole() {
           <div className="stack-xs">
             <div className="reference-section-kicker">Управление титулами</div>
             <p className="reference-sheet-copy">
-              Здесь выдается только админский титул. Системные титулы остаются у пользователя отдельно.
+              Здесь можно выдать только один админский титул. Системные титулы остаются у пользователя отдельно.
             </p>
           </div>
 
@@ -86,7 +87,7 @@ export function AdminConsole() {
                 <input
                   id="admin-amigo-id"
                   onChange={(event) => setAmigoId(event.target.value)}
-                  placeholder="AMG-PETR-0001"
+                  placeholder="AMG-USER-0001"
                   value={amigoId}
                 />
               </div>
@@ -104,18 +105,7 @@ export function AdminConsole() {
 
             <div className="reference-form-column stack-md">
               <div className="form-row">
-                <label htmlFor="admin-icon">Короткая иконка</label>
-                <input
-                  id="admin-icon"
-                  maxLength={6}
-                  onChange={(event) => setIcon(event.target.value.toUpperCase())}
-                  placeholder="ADM"
-                  value={icon}
-                />
-              </div>
-
-              <div className="form-row">
-                <label htmlFor="admin-tone">Тон свечения</label>
+                <label htmlFor="admin-tone">Тон титула</label>
                 <select id="admin-tone" onChange={(event) => setTone(event.target.value as TitleTone)} value={tone}>
                   {toneOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -124,12 +114,23 @@ export function AdminConsole() {
                   ))}
                 </select>
               </div>
+
+              <div className="form-row">
+                <label htmlFor="admin-reason">За что титул</label>
+                <textarea
+                  id="admin-reason"
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="Коротко опиши, за что пользователь получил этот титул."
+                  rows={4}
+                  value={reason}
+                />
+              </div>
             </div>
           </div>
 
           <div className="reference-bottom-action reference-bottom-action-left">
             <button className="button button-primary" disabled={loading || !access.canGrantCustomTitles} type="submit">
-              {loading ? "Выдаем титул..." : "Выдать админский титул"}
+              {loading ? "Выдаём титул..." : "Выдать админский титул"}
             </button>
           </div>
         </form>

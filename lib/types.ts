@@ -65,6 +65,8 @@ export type UserTitle = {
   tone: TitleTone;
   locked: boolean;
   grantedBy: string | null;
+  description: string | null;
+  acquiredAt: string | null;
 };
 
 export type UserAccessProfile = {
@@ -124,6 +126,8 @@ export type ChatMessage = {
   id: string;
   friendshipId: string;
   sender: "me" | "them";
+  type: "text" | "image" | "video" | "sticker";
   text: string;
+  mediaUrl: string | null;
   sentAt: string;
 };

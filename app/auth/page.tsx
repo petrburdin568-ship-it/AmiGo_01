@@ -15,7 +15,6 @@ export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -35,13 +34,11 @@ export default function AuthPage() {
           sendEmail: "Отправить письмо",
           enter: "Войти",
           forgot: "Забыли пароль?",
-          signUpDone: "Аккаунт создан, вход выполнен.",
-          signUpConfirm: "Аккаунт создан. Если в проекте включено подтверждение почты, подтверди email и войди.",
+          signUpDone: "Аккаунт создан. Теперь можно войти.",
+          signUpConfirm:
+            "Аккаунт создан. Если в проекте включено подтверждение почты, подтверди email и войди.",
           resetDone: "Письмо для сброса пароля отправлено. Открой ссылку из email.",
           signInDone: "Вход выполнен.",
-          inviteCode: "Альфа-ключ",
-          inviteCodeRequired: "Для регистрации нужен альфа-ключ.",
-          alphaAccessGranted: "Аккаунт создан. Доступ в альфу открыт.",
           actionFailed: "Не удалось выполнить действие."
         }
       : {
@@ -58,13 +55,10 @@ export default function AuthPage() {
           sendEmail: "Send email",
           enter: "Sign in",
           forgot: "Forgot password?",
-          signUpDone: "Account created, signed in successfully.",
+          signUpDone: "Account created. You can sign in now.",
           signUpConfirm: "Account created. If email confirmation is enabled, confirm your email and sign in.",
           resetDone: "Password reset email sent. Open the link from your inbox.",
           signInDone: "Signed in successfully.",
-          inviteCode: "Alpha key",
-          inviteCodeRequired: "An alpha key is required for sign-up.",
-          alphaAccessGranted: "Account created. Alpha access granted.",
           actionFailed: "Failed to complete the action."
         };
 
@@ -75,29 +69,7 @@ export default function AuthPage() {
 
     try {
       if (mode === "sign-up") {
-        if (!inviteCode.trim()) {
-          throw new Error(copy.inviteCodeRequired);
-        }
-
-        const response = await fetch("/api/auth/alpha-sign-up", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            email,
-            password,
-            inviteCode
-          })
-        });
-
-        const payload = (await response.json()) as { error?: string };
-
-        if (!response.ok) {
-          throw new Error(payload.error ?? copy.actionFailed);
-        }
-
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password
         });
@@ -106,7 +78,7 @@ export default function AuthPage() {
           throw error;
         }
 
-        setMessage(copy.alphaAccessGranted);
+        setMessage(data.session ? copy.signUpDone : copy.signUpConfirm);
         return;
       }
 
@@ -209,19 +181,6 @@ export default function AuthPage() {
                     required
                     type="password"
                     value={password}
-                  />
-                </div>
-              ) : null}
-
-              {mode === "sign-up" ? (
-                <div className="form-row">
-                  <label htmlFor="invite-code">{copy.inviteCode}</label>
-                  <input
-                    id="invite-code"
-                    onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
-                    required
-                    type="text"
-                    value={inviteCode}
                   />
                 </div>
               ) : null}

@@ -7,15 +7,23 @@ type TitleBadgeProps = {
 };
 
 export function TitleBadge({ title, compact = false }: TitleBadgeProps) {
-  const { toneClass, categoryLabel } = getTitleWidgetMeta(title);
+  const { toneClass, categoryLabel, description, acquiredAtLabel } = getTitleWidgetMeta(title);
 
   return (
-    <div className={`title-badge ${toneClass} ${compact ? "title-badge-compact" : ""}`}>
-      <span className="title-badge-icon">{title.icon}</span>
-      <span className="title-badge-copy">
+    <div className="title-badge-wrap">
+      <div className={`title-badge ${toneClass} ${compact ? "title-badge-compact" : ""}`}>
+        <span className="title-badge-copy">
+          <strong>{title.text}</strong>
+        </span>
+      </div>
+
+      <div className="title-badge-tooltip" role="note">
         <strong>{title.text}</strong>
-        {!compact ? <small>{categoryLabel}</small> : null}
-      </span>
+        <span>{categoryLabel}</span>
+        <span>Появился: {acquiredAtLabel}</span>
+        <p>{description}</p>
+        {title.grantedBy ? <span>Выдан вручную администратором.</span> : null}
+      </div>
     </div>
   );
 }

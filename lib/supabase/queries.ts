@@ -311,12 +311,97 @@ export async function sendMessage(
   const { error } = await supabase.from("messages").insert({
     friendship_id: friendshipId,
     sender_id: senderId,
-    body: text.trim()
+    body: text.trim(),
+    message_type: "text",
+    media_url: null,
+    media_path: null
   });
 
   if (error) {
     throw error;
   }
+}
+
+export async function sendStickerMessage(
+  supabase: SupabaseClient,
+  friendshipId: string,
+  senderId: string,
+  sticker: string
+) {
+  const { error } = await supabase.from("messages").insert({
+    friendship_id: friendshipId,
+    sender_id: senderId,
+    body: sticker,
+    message_type: "sticker",
+    media_url: null,
+    media_path: null
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+function buildChatImagePath(friendshipId: string, senderId: string, file: File) {
+  const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : undefined;
+  const safeExtension = extension && extension.length <= 8 ? extension.replace(/[^a-z0-9]/g, "") : "jpg";
+  return `${friendshipId}/${senderId}/${Date.now()}-${crypto.randomUUID()}.${safeExtension || "jpg"}`;
+}
+
+async function sendMediaMessage(
+  supabase: SupabaseClient,
+  friendshipId: string,
+  senderId: string,
+  file: File,
+  type: "image" | "video"
+) {
+  const path = buildChatImagePath(friendshipId, senderId, file);
+  const bucket = supabase.storage.from("chat-media");
+
+  const { error: uploadError } = await bucket.upload(path, file, {
+    cacheControl: "3600",
+    contentType: file.type || (type === "video" ? "video/mp4" : "image/jpeg"),
+    upsert: false
+  });
+
+  if (uploadError) {
+    throw uploadError;
+  }
+
+  const {
+    data: { publicUrl }
+  } = bucket.getPublicUrl(path);
+
+  const { error } = await supabase.from("messages").insert({
+    friendship_id: friendshipId,
+    sender_id: senderId,
+    body: type,
+    message_type: type,
+    media_url: publicUrl,
+    media_path: path
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function sendImageMessage(
+  supabase: SupabaseClient,
+  friendshipId: string,
+  senderId: string,
+  file: File
+) {
+  await sendMediaMessage(supabase, friendshipId, senderId, file, "image");
+}
+
+export async function sendVideoMessage(
+  supabase: SupabaseClient,
+  friendshipId: string,
+  senderId: string,
+  file: File
+) {
+  await sendMediaMessage(supabase, friendshipId, senderId, file, "video");
 }
 
 export function appendIncomingMessage(

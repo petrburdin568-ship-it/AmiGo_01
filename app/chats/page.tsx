@@ -27,6 +27,8 @@ export default function ChatsPage() {
           profile: "Профиль",
           find: "Найти собеседника",
           loadError: "Не удалось загрузить чаты.",
+          inbox: "Твой список диалогов",
+          hint: "Чистый современный экран со всеми активными переписками.",
           locale: "ru-RU"
         }
       : {
@@ -39,6 +41,8 @@ export default function ChatsPage() {
           profile: "Profile",
           find: "Find someone",
           loadError: "Failed to load chats.",
+          inbox: "Your conversation list",
+          hint: "A clean modern screen for all active conversations.",
           locale: "en-US"
         };
 
@@ -74,17 +78,16 @@ export default function ChatsPage() {
   if (!session && !loading) {
     return (
       <AppShell mode="plain" title={copy.title} description="">
-        <section className="reference-sheet dialog-sheet stack-lg">
-          <div className="reference-sheet-top">
-            <span className="reference-brand-label">AmiGo</span>
-          </div>
+        <section className="modern-screen modern-screen-chats">
+          <header className="modern-screen-head">
+            <div className="modern-head-copy">
+              <span className="modern-kicker">AmiGo</span>
+              <h1 className="modern-screen-title">{copy.title}</h1>
+              <p className="modern-screen-text">{copy.signInPrompt}</p>
+            </div>
+          </header>
 
-          <div className="screen-heading-row">
-            <h1 className="reference-sheet-heading">{copy.title}</h1>
-            <p className="reference-sheet-copy">{copy.signInPrompt}</p>
-          </div>
-
-          <div className="reference-empty reference-empty-compact">
+          <div className="modern-empty-state">
             <Link className="button button-primary" href="/auth">
               {copy.signIn}
             </Link>
@@ -96,43 +99,44 @@ export default function ChatsPage() {
 
   return (
     <AppShell mode="plain" title={copy.title} description="">
-      <section className="reference-sheet dialog-sheet stack-lg">
-        <div className="reference-sheet-top">
-          <span className="reference-brand-label">AmiGo</span>
-        </div>
+      <section className="modern-screen modern-screen-chats">
+        <header className="modern-screen-head">
+          <div className="modern-head-copy">
+            <span className="modern-kicker">{copy.inbox}</span>
+            <h1 className="modern-screen-title">{copy.title}</h1>
+            <p className="modern-screen-text">{copy.hint}</p>
+          </div>
 
-        <div className="screen-heading-row">
-          <h1 className="reference-sheet-heading">{copy.title}</h1>
-          <div className="reference-inline-pills">
-            <span className="reference-meta-pill">
+          <div className="modern-meta-pills">
+            <span className="reference-meta-pill modern-meta-pill">
               {friends.length} {copy.dialogs}
             </span>
           </div>
-        </div>
+        </header>
 
         {message ? <div className="reference-sheet-message">{message}</div> : null}
 
         {friends.length === 0 ? (
-          <div className="reference-empty reference-empty-compact">
+          <div className="modern-empty-state modern-empty-state-wide">
             <p>{copy.empty}</p>
           </div>
         ) : (
-          <div className="reference-dialog-list reference-dialog-list-sheet">
+          <div className="modern-chat-list">
             {friends.map((friend) => (
-              <article key={friend.friendshipId} className="reference-dialog-row reference-dialog-row-sheet">
-                <Link className="reference-dialog-avatar" href={`/friends/${friend.friendshipId}`}>
+              <article key={friend.friendshipId} className="modern-chat-row">
+                <Link className="modern-chat-avatar-link" href={`/friends/${friend.friendshipId}`}>
                   <UserAvatar name={friend.profile.name} size="sm" src={friend.profile.avatar} />
                 </Link>
 
-                <Link className="reference-dialog-main" href={`/chats/${friend.friendshipId}`}>
-                  <div className="reference-dialog-top">
+                <Link className="modern-chat-main" href={`/chats/${friend.friendshipId}`}>
+                  <div className="modern-chat-top">
                     <strong>{friend.profile.name}</strong>
                     <span>{new Date(friend.createdAt).toLocaleDateString(copy.locale)}</span>
                   </div>
-                  <p>{friend.profile.bio || copy.chatReady}</p>
+                  <p className="modern-chat-preview">{friend.profile.bio || copy.chatReady}</p>
                 </Link>
 
-                <Link className="reference-dialog-side" href={`/friends/${friend.friendshipId}`}>
+                <Link className="button button-secondary modern-chat-side" href={`/friends/${friend.friendshipId}`}>
                   {copy.profile}
                 </Link>
               </article>
@@ -140,7 +144,7 @@ export default function ChatsPage() {
           </div>
         )}
 
-        <div className="reference-bottom-action">
+        <div className="modern-action-bar">
           <Link className="button button-primary reference-bottom-button" href="/discover">
             {copy.find}
           </Link>

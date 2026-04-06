@@ -50,6 +50,9 @@ export type MessageRow = {
   friendship_id: string;
   sender_id: string;
   body: string;
+  message_type: "text" | "image" | "video" | "sticker";
+  media_url: string | null;
+  media_path: string | null;
   created_at: string;
 };
 
@@ -160,7 +163,9 @@ export function mapMessageRow(row: MessageRow, currentUserId: string): ChatMessa
     id: row.id,
     friendshipId: row.friendship_id,
     sender: row.sender_id === currentUserId ? "me" : "them",
+    type: row.message_type ?? "text",
     text: row.body,
+    mediaUrl: row.media_url,
     sentAt: row.created_at
   };
 }

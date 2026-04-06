@@ -101,7 +101,7 @@ $$;
 create or replace function public.build_registration_title()
 returns jsonb
 language sql
-immutable
+stable
 as $$
   select jsonb_build_object(
     'id', 'registration-legionnaire',
@@ -110,14 +110,16 @@ as $$
     'icon', 'LEG',
     'tone', 'silver',
     'locked', true,
-    'grantedBy', null
+    'grantedBy', null,
+    'description', 'Выдаётся автоматически за регистрацию в AmiGo.',
+    'acquiredAt', timezone('utc', now())
   );
 $$;
 
 create or replace function public.build_alpha_title()
 returns jsonb
 language sql
-immutable
+stable
 as $$
   select jsonb_build_object(
     'id', 'alpha-pretorian',
@@ -126,7 +128,9 @@ as $$
     'icon', 'PRT',
     'tone', 'gold',
     'locked', true,
-    'grantedBy', null
+    'grantedBy', null,
+    'description', 'Выдаётся за участие в раннем альфа-тесте проекта.',
+    'acquiredAt', timezone('utc', now())
   );
 $$;
 
@@ -193,7 +197,7 @@ create or replace function public.build_admin_title(
 )
 returns jsonb
 language sql
-immutable
+stable
 as $$
   select jsonb_build_object(
     'id', 'admin-custom',
@@ -202,14 +206,16 @@ as $$
     'icon', upper(coalesce(nullif(trim(title_icon), ''), 'ADM')),
     'tone', coalesce(nullif(trim(title_tone), ''), 'gold'),
     'locked', true,
-    'grantedBy', granted_by
+    'grantedBy', granted_by,
+    'description', 'Выдан администратором вручную.',
+    'acquiredAt', timezone('utc', now())
   );
 $$;
 
 create or replace function public.normalize_profile_titles(input_titles jsonb)
 returns jsonb
 language plpgsql
-immutable
+stable
 as $$
 declare
   normalized jsonb := '[]'::jsonb;
@@ -233,7 +239,9 @@ begin
             'icon', upper(coalesce(nullif(item->>'icon', ''), 'TAG')),
             'tone', case when item->>'tone' in ('silver', 'gold', 'cyan', 'royal') then item->>'tone' else 'silver' end,
             'locked', coalesce((item->>'locked')::boolean, true),
-            'grantedBy', nullif(item->>'grantedBy', '')
+            'grantedBy', nullif(item->>'grantedBy', ''),
+            'description', nullif(item->>'description', ''),
+            'acquiredAt', nullif(item->>'acquiredAt', '')
           )
         );
       end if;
@@ -265,7 +273,7 @@ create or replace function public.resolve_active_title_id(
 )
 returns text
 language plpgsql
-immutable
+stable
 as $$
 declare
   normalized jsonb := public.normalize_profile_titles(input_titles);
@@ -297,7 +305,7 @@ create or replace function public.build_legacy_titles(
 )
 returns jsonb
 language plpgsql
-immutable
+stable
 as $$
 declare
   normalized_text text := trim(coalesce(legacy_title_text, ''));
@@ -520,8 +528,20 @@ create table if not exists public.messages (
   friendship_id uuid not null references public.friendships (id) on delete cascade,
   sender_id uuid not null references auth.users (id) on delete cascade,
   body text not null check (char_length(trim(body)) > 0),
+  message_type text not null default 'text' check (message_type in ('text', 'image', 'video', 'sticker')),
+  media_url text,
+  media_path text,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.messages add column if not exists message_type text;
+alter table public.messages add column if not exists media_url text;
+alter table public.messages add column if not exists media_path text;
+alter table public.messages alter column message_type set default 'text';
+update public.messages set message_type = 'text' where message_type is null;
+alter table public.messages alter column message_type set not null;
+alter table public.messages drop constraint if exists messages_message_type_check;
+alter table public.messages add constraint messages_message_type_check check (message_type in ('text', 'image', 'video', 'sticker'));
 
 create index if not exists messages_friendship_created_at_idx
   on public.messages (friendship_id, created_at);
@@ -536,46 +556,22 @@ create policy "profiles_select_own"
 on public.profiles
 for select
 to authenticated
-using (
-  auth.uid() = id
-  and (
-    public.user_has_alpha_access(auth.uid())
-    or public.is_emperor_actor(auth.uid())
-  )
-);
+using (auth.uid() = id);
 
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own"
 on public.profiles
 for insert
 to authenticated
-with check (
-  auth.uid() = id
-  and (
-    public.user_has_alpha_access(auth.uid())
-    or public.is_emperor_actor(auth.uid())
-  )
-);
+with check (auth.uid() = id);
 
 drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own"
 on public.profiles
 for update
 to authenticated
-using (
-  auth.uid() = id
-  and (
-    public.user_has_alpha_access(auth.uid())
-    or public.is_emperor_actor(auth.uid())
-  )
-)
-with check (
-  auth.uid() = id
-  and (
-    public.user_has_alpha_access(auth.uid())
-    or public.is_emperor_actor(auth.uid())
-  )
-);
+using (auth.uid() = id)
+with check (auth.uid() = id);
 
 drop trigger if exists friend_requests_set_updated_at on public.friend_requests;
 create trigger friend_requests_set_updated_at
@@ -1179,6 +1175,33 @@ with check (
       and (auth.uid() = friendships.user_one or auth.uid() = friendships.user_two)
   )
 );
+
+insert into storage.buckets (id, name, public)
+values ('chat-media', 'chat-media', true)
+on conflict (id) do update
+set public = excluded.public;
+
+drop policy if exists "chat_media_public_read" on storage.objects;
+create policy "chat_media_public_read"
+on storage.objects
+for select
+to authenticated
+using (bucket_id = 'chat-media');
+
+drop policy if exists "chat_media_authenticated_upload" on storage.objects;
+create policy "chat_media_authenticated_upload"
+on storage.objects
+for insert
+to authenticated
+with check (bucket_id = 'chat-media');
+
+drop policy if exists "chat_media_authenticated_update" on storage.objects;
+create policy "chat_media_authenticated_update"
+on storage.objects
+for update
+to authenticated
+using (bucket_id = 'chat-media')
+with check (bucket_id = 'chat-media');
 
 do $$
 begin

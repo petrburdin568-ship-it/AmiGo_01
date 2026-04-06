@@ -18,7 +18,9 @@ export function makeRegistrationTitle(): UserTitle {
     icon: "LEG",
     tone: "silver",
     locked: true,
-    grantedBy: null
+    grantedBy: null,
+    description: "Выдаётся автоматически за регистрацию в AmiGo.",
+    acquiredAt: new Date().toISOString()
   };
 }
 
@@ -30,7 +32,9 @@ export function makeAlphaTestTitle(): UserTitle {
     icon: "PRT",
     tone: "gold",
     locked: true,
-    grantedBy: null
+    grantedBy: null,
+    description: "Выдаётся за участие в раннем альфа-тесте проекта.",
+    acquiredAt: new Date().toISOString()
   };
 }
 
@@ -38,7 +42,8 @@ export function makeAdminTitle(
   text: string,
   icon = "ADM",
   tone: TitleTone = "gold",
-  grantedBy: string | null = null
+  grantedBy: string | null = null,
+  description: string | null = null
 ): UserTitle {
   return {
     id: ADMIN_TITLE_ID,
@@ -47,7 +52,9 @@ export function makeAdminTitle(
     icon: icon.trim().toUpperCase() || "ADM",
     tone,
     locked: true,
-    grantedBy
+    grantedBy,
+    description: description?.trim() || "Выдан администратором вручную.",
+    acquiredAt: new Date().toISOString()
   };
 }
 
@@ -100,7 +107,9 @@ export function normalizeTitles(rawTitles: unknown): UserTitle[] {
         icon: icon || "TAG",
         tone: isValidTone(candidate.tone) ? candidate.tone : "silver",
         locked: candidate.locked !== false,
-        grantedBy: typeof candidate.grantedBy === "string" ? candidate.grantedBy : null
+        grantedBy: typeof candidate.grantedBy === "string" ? candidate.grantedBy : null,
+        description: typeof candidate.description === "string" ? candidate.description.trim() : null,
+        acquiredAt: typeof candidate.acquiredAt === "string" ? candidate.acquiredAt : null
       } satisfies UserTitle;
     })
     .filter((item): item is UserTitle => item !== null);
@@ -124,10 +133,29 @@ export function resolveActiveTitle(
   return titles.find((title) => title.id === activeTitleId) ?? titles[0] ?? makeRegistrationTitle();
 }
 
+export function formatTitleDate(value: string | null) {
+  if (!value) {
+    return "Дата не указана";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Дата не указана";
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  }).format(date);
+}
+
 export function getTitleWidgetMeta(title: UserTitle) {
   return {
     toneClass: resolveTitleToneClass(title.tone),
-    categoryLabel: TITLE_CATEGORY_LABELS[title.category]
+    categoryLabel: TITLE_CATEGORY_LABELS[title.category],
+    description: title.description ?? "Подробности по титулу пока не указаны.",
+    acquiredAtLabel: formatTitleDate(title.acquiredAt)
   };
 }
 
