@@ -27,8 +27,8 @@ export default function ChatsPage() {
           profile: "Профиль",
           find: "Найти собеседника",
           loadError: "Не удалось загрузить чаты.",
-          inbox: "Твой список диалогов",
-          hint: "Чистый современный экран со всеми активными переписками.",
+          inbox: "Твои диалоги",
+          hint: "Все активные переписки в одном месте.",
           locale: "ru-RU"
         }
       : {
@@ -41,8 +41,8 @@ export default function ChatsPage() {
           profile: "Profile",
           find: "Find someone",
           loadError: "Failed to load chats.",
-          inbox: "Your conversation list",
-          hint: "A clean modern screen for all active conversations.",
+          inbox: "Your conversations",
+          hint: "All active conversations in one place.",
           locale: "en-US"
         };
 
@@ -78,19 +78,20 @@ export default function ChatsPage() {
   if (!session && !loading) {
     return (
       <AppShell mode="plain" title={copy.title} description="">
-        <section className="modern-screen modern-screen-chats">
-          <header className="modern-screen-head">
-            <div className="modern-head-copy">
-              <span className="modern-kicker">AmiGo</span>
-              <h1 className="modern-screen-title">{copy.title}</h1>
-              <p className="modern-screen-text">{copy.signInPrompt}</p>
+        <section className="tg-home">
+          <header className="tg-home-header">
+            <div className="tg-home-header-copy">
+              <h1>{copy.title}</h1>
+              <p>{copy.signInPrompt}</p>
             </div>
           </header>
 
-          <div className="modern-empty-state">
-            <Link className="button button-primary" href="/auth">
-              {copy.signIn}
-            </Link>
+          <div className="tg-list-panel">
+            <div className="tg-empty-screen">
+              <Link className="button button-primary" href="/auth">
+                {copy.signIn}
+              </Link>
+            </div>
           </div>
         </section>
       </AppShell>
@@ -99,12 +100,11 @@ export default function ChatsPage() {
 
   return (
     <AppShell mode="plain" title={copy.title} description="">
-      <section className="modern-screen modern-screen-chats">
-        <header className="modern-screen-head">
-          <div className="modern-head-copy">
-            <span className="modern-kicker">{copy.inbox}</span>
-            <h1 className="modern-screen-title">{copy.title}</h1>
-            <p className="modern-screen-text">{copy.hint}</p>
+      <section className="tg-home">
+        <header className="tg-home-header">
+          <div className="tg-home-header-copy">
+            <h1>{copy.title}</h1>
+            <p>{copy.hint}</p>
           </div>
 
           <div className="modern-meta-pills">
@@ -116,39 +116,40 @@ export default function ChatsPage() {
 
         {message ? <div className="reference-sheet-message">{message}</div> : null}
 
-        {friends.length === 0 ? (
-          <div className="modern-empty-state modern-empty-state-wide">
-            <p>{copy.empty}</p>
-          </div>
-        ) : (
-          <div className="modern-chat-list">
-            {friends.map((friend) => (
-              <article key={friend.friendshipId} className="modern-chat-row">
-                <Link className="modern-chat-avatar-link" href={`/friends/${friend.friendshipId}`}>
-                  <UserAvatar name={friend.profile.name} size="sm" src={friend.profile.avatar} />
-                </Link>
+        <div className="tg-list-panel">
+          {friends.length === 0 ? (
+            <div className="tg-empty-screen">
+              <h2>{copy.inbox}</h2>
+              <p>{copy.empty}</p>
+            </div>
+          ) : (
+            <div className="tg-dialog-list">
+              {friends.map((friend) => (
+                <article key={friend.friendshipId} className="tg-dialog-row">
+                  <Link className="tg-dialog-avatar" href={`/friends/${friend.friendshipId}`}>
+                    <UserAvatar name={friend.profile.name} size="sm" src={friend.profile.avatar} />
+                  </Link>
 
-                <Link className="modern-chat-main" href={`/chats/${friend.friendshipId}`}>
-                  <div className="modern-chat-top">
-                    <strong>{friend.profile.name}</strong>
-                    <span>{new Date(friend.createdAt).toLocaleDateString(copy.locale)}</span>
-                  </div>
-                  <p className="modern-chat-preview">{friend.profile.bio || copy.chatReady}</p>
-                </Link>
+                  <Link className="tg-dialog-main" href={`/chats/${friend.friendshipId}`}>
+                    <div className="tg-dialog-top">
+                      <strong>{friend.profile.name}</strong>
+                      <span>{new Date(friend.createdAt).toLocaleDateString(copy.locale)}</span>
+                    </div>
+                    <p>{friend.profile.bio || copy.chatReady}</p>
+                  </Link>
 
-                <Link className="button button-secondary modern-chat-side" href={`/friends/${friend.friendshipId}`}>
-                  {copy.profile}
-                </Link>
-              </article>
-            ))}
-          </div>
-        )}
-
-        <div className="modern-action-bar">
-          <Link className="button button-primary reference-bottom-button" href="/discover">
-            {copy.find}
-          </Link>
+                  <Link className="tg-dialog-side" href={`/friends/${friend.friendshipId}`}>
+                    {copy.profile}
+                  </Link>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
+
+        <Link className="tg-fab" href="/discover">
+          {copy.find}
+        </Link>
       </section>
     </AppShell>
   );

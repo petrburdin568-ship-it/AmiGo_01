@@ -31,9 +31,7 @@ import type { MessageRow } from "@/lib/supabase/types";
 import { getStickerByValue, STICKER_OPTIONS } from "@/lib/stickers";
 import type { ChatMessage, FriendRecord } from "@/lib/types";
 
-type MediaPreviewState =
-  | { url: string; type: "image" | "video" }
-  | null;
+type MediaPreviewState = { url: string; type: "image" | "video" } | null;
 
 type ContextMenuState = {
   messageId: string;
@@ -273,9 +271,8 @@ export default function ChatPage() {
       return;
     }
 
-    const copyValue = contextMenu.type === "text" || contextMenu.type === "sticker"
-      ? contextMenu.text
-      : contextMenu.mediaUrl ?? "";
+    const copyValue =
+      contextMenu.type === "text" || contextMenu.type === "sticker" ? contextMenu.text : contextMenu.mediaUrl ?? "";
 
     if (!copyValue) {
       setContextMenu(null);
@@ -348,10 +345,7 @@ export default function ChatPage() {
   if (!session && !loading) {
     return (
       <AppShell mode="plain" title="Чат" description="">
-        <section className="reference-sheet stack-lg">
-          <div className="reference-sheet-top">
-            <span className="reference-brand-label">AmiGo</span>
-          </div>
+        <section className="stack-lg">
           <div className="reference-bottom-action reference-bottom-action-left">
             <Link className="button button-primary" href="/auth">
               Войти
@@ -365,13 +359,8 @@ export default function ChatPage() {
   if (loadingChat) {
     return (
       <AppShell mode="plain" title="Чат" description="">
-        <section className="reference-sheet stack-lg">
-          <div className="reference-sheet-top">
-            <span className="reference-brand-label">AmiGo</span>
-          </div>
-          <div className="reference-sheet-block">
-            <p className="reference-sheet-copy">Загружаем переписку...</p>
-          </div>
+        <section className="stack-lg">
+          <p className="reference-sheet-copy">Загружаем переписку...</p>
         </section>
       </AppShell>
     );
@@ -380,10 +369,7 @@ export default function ChatPage() {
   if (!friend) {
     return (
       <AppShell mode="plain" title="Чат" description="">
-        <section className="reference-sheet stack-lg">
-          <div className="reference-sheet-top">
-            <span className="reference-brand-label">AmiGo</span>
-          </div>
+        <section className="stack-lg">
           {message ? <div className="reference-sheet-message">{message}</div> : null}
           <div className="reference-bottom-action reference-bottom-action-left">
             <Link className="button button-primary" href="/chats">
@@ -398,6 +384,7 @@ export default function ChatPage() {
   return (
     <AppShell mode="chat" title="" description="">
       {message ? <div className="toast-panel tg-chat-toast">{message}</div> : null}
+
       {preview ? (
         <div className="tg-media-viewer" onClick={() => setPreview(null)} role="dialog">
           <button
@@ -455,7 +442,7 @@ export default function ChatPage() {
           </div>
 
           <div className="tg-chatbar-actions">
-            <span className="tg-chatbar-status">в сети для чата</span>
+            <span className="tg-chatbar-status">Готов к переписке</span>
             <Link className="tg-chatbar-profile" href={`/friends/${friend.friendshipId}`}>
               Профиль
             </Link>
@@ -513,7 +500,7 @@ export default function ChatPage() {
                   </div>
                 ) : null}
 
-                {item.type === "text" ? <span>{item.text}</span> : null}
+                {item.type === "text" ? <div className="tg-bubble-text">{item.text}</div> : null}
 
                 <div className="tg-bubble-footer">
                   <div className="tg-bubble-meta">{formatMessageTime(item.sentAt)}</div>
@@ -543,20 +530,9 @@ export default function ChatPage() {
             </div>
           ) : null}
 
-          <input
-            accept="image/*,video/*"
-            className="tg-file-input"
-            onChange={handleMediaSelect}
-            ref={fileInputRef}
-            type="file"
-          />
+          <input accept="image/*,video/*" className="tg-file-input" onChange={handleMediaSelect} ref={fileInputRef} type="file" />
 
-          <button
-            aria-label="Добавить файл"
-            className="tg-compose-icon"
-            onClick={openFilePicker}
-            type="button"
-          >
+          <button aria-label="Добавить файл" className="tg-compose-icon" onClick={openFilePicker} type="button">
             +
           </button>
 
