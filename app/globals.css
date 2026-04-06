@@ -2158,7 +2158,9 @@ body[data-theme="dark"] .tg-list-panel {
 .tg-chat-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
   min-height: 100dvh;
+  overflow: hidden;
   background:
     radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 24%),
     linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 22%, transparent), transparent 20%),
@@ -2170,6 +2172,15 @@ body[data-theme="dark"] .tg-chat-shell {
     radial-gradient(circle at 18% 12%, rgba(21, 53, 88, 0.09), transparent 22%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent 16%),
     #07111c;
+}
+
+.tg-chat-top {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .tg-chatbar {
@@ -2270,6 +2281,7 @@ body[data-theme="dark"] .tg-chat-shell {
   gap: 10px;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 18px 18px 12px;
 }
 
@@ -3041,6 +3053,10 @@ body[data-theme="dark"] .tg-chat-shell {
 
   .tg-chatbar {
     padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  }
+
+  .tg-chat-top {
+    top: 0;
   }
 
   .tg-chatbar-actions {
@@ -4838,6 +4854,65 @@ body[data-theme="dark"] .tg-chat-shell {
   gap: 18px;
 }
 
+.arena-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, var(--stroke) 42%, transparent);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--metal-soft) 18%, transparent), transparent 32%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 92%, transparent), color-mix(in srgb, var(--bg) 82%, transparent));
+}
+
+.arena-hero-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arena-hero-copy h1,
+.arena-hero-copy p {
+  margin: 0;
+}
+
+.arena-hero-copy p {
+  max-width: 64ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.arena-hero-kicker {
+  color: color-mix(in srgb, var(--metal) 56%, var(--text));
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.arena-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.arena-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--metal) 46%, var(--stroke));
+  background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+  color: color-mix(in srgb, var(--metal) 44%, var(--text));
+  white-space: nowrap;
+}
+
 .arena-topbar {
   display: flex;
   align-items: center;
@@ -4857,8 +4932,9 @@ body[data-theme="dark"] .tg-chat-shell {
 
 .arena-board {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 18px;
+  align-items: stretch;
 }
 
 .arena-fighter {
@@ -4868,7 +4944,9 @@ body[data-theme="dark"] .tg-chat-shell {
   padding: 18px;
   border: 1px solid color-mix(in srgb, var(--stroke) 46%, transparent);
   border-radius: 28px;
-  background: color-mix(in srgb, var(--bg-elevated) 86%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 92%, transparent), color-mix(in srgb, var(--bg) 86%, transparent)),
+    color-mix(in srgb, var(--bg-elevated) 86%, transparent);
 }
 
 .arena-fighter-head {
@@ -4889,14 +4967,404 @@ body[data-theme="dark"] .tg-chat-shell {
 }
 
 .arena-fighter-visual {
-  display: grid;
-  place-items: center;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   min-height: 180px;
   border-radius: 24px;
-  font-size: clamp(4rem, 8vw, 6rem);
   background:
+    radial-gradient(circle at bottom, rgba(255, 191, 0, 0.08), transparent 44%),
     radial-gradient(circle at top, color-mix(in srgb, var(--metal-soft) 16%, transparent), transparent 60%),
     color-mix(in srgb, var(--bg) 74%, var(--bg-elevated));
+  overflow: hidden;
+}
+
+.arena-fighter-visual::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 20px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--metal) 54%, transparent), transparent);
+}
+
+.arena-board-center {
+  position: relative;
+  display: flex;
+  min-width: 128px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.arena-board-center::before {
+  content: "";
+  position: absolute;
+  inset: 12px 50% 12px auto;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--stroke) 72%, transparent), transparent);
+  transform: translateX(50%);
+}
+
+.arena-board-round,
+.arena-board-turn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--stroke) 72%, transparent);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.arena-board-versus {
+  display: grid;
+  place-items: center;
+  width: 82px;
+  height: 82px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--metal) 52%, transparent);
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--metal-soft) 24%, transparent), transparent 54%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 94%, transparent), color-mix(in srgb, var(--bg) 88%, transparent));
+  color: color-mix(in srgb, var(--metal) 56%, var(--text));
+  font-size: 1.2rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.arena-sprite {
+  position: relative;
+  width: min(220px, 100%);
+  height: 170px;
+  transform-origin: bottom center;
+  transition: transform 0.22s ease, filter 0.22s ease, opacity 0.22s ease;
+}
+
+.arena-sprite-right {
+  transform: scaleX(-1);
+}
+
+.arena-sprite-active {
+  transform: translateY(-4px);
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--metal) 34%, transparent));
+}
+
+.arena-sprite-right.arena-sprite-active {
+  transform: scaleX(-1) translateY(-4px);
+}
+
+.arena-sprite-guarding {
+  filter: saturate(1.1) drop-shadow(0 0 14px color-mix(in srgb, var(--metal-soft) 24%, transparent));
+}
+
+.arena-sprite-defeated {
+  opacity: 0.44;
+  transform: rotate(11deg) translateY(8px);
+}
+
+.arena-sprite-right.arena-sprite-defeated {
+  transform: scaleX(-1) rotate(11deg) translateY(8px);
+}
+
+.arena-sprite-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  width: 112px;
+  height: 22px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.36) 0%, rgba(0, 0, 0, 0.08) 62%, transparent 75%);
+  transform: translateX(-50%);
+}
+
+.arena-sprite-body {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  width: 104px;
+  height: 132px;
+  transform: translateX(-50%);
+}
+
+.arena-sprite-head {
+  position: absolute;
+  top: 4px;
+  left: 35px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f4d7b7 0%, #d9ab7f 100%);
+  border: 2px solid rgba(16, 24, 40, 0.28);
+  z-index: 3;
+}
+
+.arena-sprite-plume {
+  position: absolute;
+  top: -4px;
+  left: 43px;
+  width: 18px;
+  height: 18px;
+  border-radius: 12px 12px 4px 4px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--metal) 70%, #fff1b2), color-mix(in srgb, var(--accent) 72%, var(--metal)));
+  z-index: 2;
+}
+
+.arena-sprite-torso {
+  position: absolute;
+  top: 34px;
+  left: 29px;
+  width: 46px;
+  height: 52px;
+  border-radius: 18px 18px 14px 14px;
+  background: linear-gradient(180deg, #384554 0%, #1f2836 100%);
+  border: 2px solid rgba(16, 24, 40, 0.3);
+  z-index: 2;
+}
+
+.arena-sprite-arm,
+.arena-sprite-leg {
+  position: absolute;
+  background: linear-gradient(180deg, #445366 0%, #233041 100%);
+  border-radius: 999px;
+}
+
+.arena-sprite-arm {
+  top: 42px;
+  width: 12px;
+  height: 46px;
+  z-index: 1;
+}
+
+.arena-sprite-arm-back {
+  left: 18px;
+  transform: rotate(18deg);
+}
+
+.arena-sprite-arm-front {
+  right: 15px;
+  transform: rotate(-26deg);
+}
+
+.arena-sprite-leg {
+  top: 80px;
+  width: 14px;
+  height: 48px;
+  z-index: 1;
+}
+
+.arena-sprite-leg-back {
+  left: 35px;
+  transform: rotate(10deg);
+}
+
+.arena-sprite-leg-front {
+  right: 31px;
+  transform: rotate(-8deg);
+}
+
+.arena-sprite-weapon {
+  position: absolute;
+  right: -4px;
+  top: 34px;
+  width: 52px;
+  height: 62px;
+  z-index: 4;
+}
+
+.arena-sprite-weapon-core {
+  position: absolute;
+  inset: 0;
+}
+
+.arena-sprite-weapon-gladius .arena-sprite-weapon-core::before,
+.arena-sprite-weapon-longsword .arena-sprite-weapon-core::before,
+.arena-sprite-weapon-spear .arena-sprite-weapon-core::before,
+.arena-sprite-weapon-axe .arena-sprite-weapon-core::before,
+.arena-sprite-weapon-gladius .arena-sprite-weapon-core::after,
+.arena-sprite-weapon-longsword .arena-sprite-weapon-core::after,
+.arena-sprite-weapon-spear .arena-sprite-weapon-core::after,
+.arena-sprite-weapon-axe .arena-sprite-weapon-core::after {
+  content: "";
+  position: absolute;
+  display: block;
+}
+
+.arena-sprite-weapon-gladius .arena-sprite-weapon-core::before {
+  right: 12px;
+  top: 4px;
+  width: 8px;
+  height: 34px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #eef4ff 0%, #9db1c8 100%);
+  transform: rotate(18deg);
+}
+
+.arena-sprite-weapon-gladius .arena-sprite-weapon-core::after {
+  right: 8px;
+  bottom: 8px;
+  width: 18px;
+  height: 5px;
+  border-radius: 999px;
+  background: #7a5632;
+  transform: rotate(18deg);
+}
+
+.arena-sprite-weapon-longsword .arena-sprite-weapon-core::before {
+  right: 16px;
+  top: -2px;
+  width: 7px;
+  height: 50px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #f8fbff 0%, #9db1c8 100%);
+  transform: rotate(20deg);
+}
+
+.arena-sprite-weapon-longsword .arena-sprite-weapon-core::after {
+  right: 6px;
+  bottom: 10px;
+  width: 24px;
+  height: 5px;
+  border-radius: 999px;
+  background: #7a5632;
+  transform: rotate(20deg);
+}
+
+.arena-sprite-weapon-spear .arena-sprite-weapon-core::before {
+  right: 4px;
+  top: -8px;
+  width: 4px;
+  height: 72px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #8f6238 0%, #c08a54 100%);
+  transform: rotate(18deg);
+}
+
+.arena-sprite-weapon-spear .arena-sprite-weapon-core::after {
+  right: 0;
+  top: -8px;
+  width: 12px;
+  height: 16px;
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  background: linear-gradient(180deg, #f7fbff 0%, #9db1c8 100%);
+  transform: rotate(18deg);
+}
+
+.arena-sprite-weapon-axe .arena-sprite-weapon-core::before {
+  right: 8px;
+  top: 4px;
+  width: 6px;
+  height: 52px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #8f6238 0%, #c08a54 100%);
+  transform: rotate(18deg);
+}
+
+.arena-sprite-weapon-axe .arena-sprite-weapon-core::after {
+  right: 10px;
+  top: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 0 14px 14px 14px;
+  background: linear-gradient(180deg, #f3f8ff 0%, #9db1c8 100%);
+  transform: rotate(22deg);
+}
+
+.arena-sprite-shield {
+  position: absolute;
+  left: -6px;
+  top: 46px;
+  width: 28px;
+  height: 34px;
+  border-radius: 14px 14px 10px 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--metal) 62%, #fff1c8), color-mix(in srgb, var(--accent) 76%, var(--metal)));
+  border: 2px solid rgba(24, 18, 8, 0.28);
+  z-index: 3;
+}
+
+.arena-sprite-centurion .arena-sprite-torso {
+  background: linear-gradient(180deg, #5b0f18 0%, #351116 100%);
+}
+
+.arena-sprite-centurion .arena-sprite-plume {
+  background: linear-gradient(180deg, #b40f2a 0%, #6a091d 100%);
+}
+
+.arena-sprite-centurion .arena-sprite-shield {
+  background: linear-gradient(180deg, #b40f2a 0%, #6a091d 100%);
+}
+
+.arena-sprite-hoplite .arena-sprite-torso {
+  background: linear-gradient(180deg, #0e5b7d 0%, #173246 100%);
+}
+
+.arena-sprite-hoplite .arena-sprite-shield {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #127db0 0%, #0b4361 100%);
+}
+
+.arena-sprite-knight .arena-sprite-torso {
+  background: linear-gradient(180deg, #7f8796 0%, #495362 100%);
+}
+
+.arena-sprite-knight .arena-sprite-head {
+  background: linear-gradient(180deg, #d2d8df 0%, #9aa7b7 100%);
+}
+
+.arena-sprite-knight .arena-sprite-plume {
+  background: linear-gradient(180deg, #d8e1eb 0%, #8695a8 100%);
+}
+
+.arena-sprite-raider .arena-sprite-torso {
+  background: linear-gradient(180deg, #6d4a21 0%, #342214 100%);
+}
+
+.arena-sprite-raider .arena-sprite-plume {
+  display: none;
+}
+
+.arena-sprite-raider .arena-sprite-shield {
+  background: linear-gradient(180deg, #8a6235 0%, #52361b 100%);
+}
+
+.arena-sprite-guarding .arena-sprite-shield {
+  transform: translateX(10px) translateY(-2px) scale(1.08);
+}
+
+.arena-hud {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.arena-hud-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--stroke) 48%, transparent);
+  background: color-mix(in srgb, var(--bg-elevated) 84%, transparent);
+}
+
+.arena-hud-chip span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.arena-hud-chip strong {
+  line-height: 1.35;
 }
 
 .arena-hp {
@@ -5080,8 +5548,20 @@ body[data-theme="dark"] .tg-chat-shell {
 
   .arena-board,
   .arena-setup-grid,
-  .arena-action-grid {
+  .arena-action-grid,
+  .arena-hud {
     grid-template-columns: 1fr;
+  }
+
+  .arena-board-center {
+    min-width: 0;
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 0 8px;
+  }
+
+  .arena-board-center::before {
+    content: none;
   }
 }
 
@@ -5288,6 +5768,14 @@ body[data-theme="dark"] .tg-chat-shell {
   .arena-topbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .arena-hero {
+    flex-direction: column;
+  }
+
+  .arena-hero-badges {
+    justify-content: flex-start;
   }
 
   .arena-fighter {

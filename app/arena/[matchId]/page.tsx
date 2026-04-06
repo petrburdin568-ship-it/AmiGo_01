@@ -43,6 +43,47 @@ function getWeaponLabel(value: ArenaWeapon | null) {
   return WEAPONS.find((item) => item.value === value)?.label ?? "Без оружия";
 }
 
+function ArenaFighterSprite({
+  appearance,
+  weapon,
+  side,
+  active,
+  guarding,
+  hp
+}: {
+  appearance: ArenaAppearance | null;
+  weapon: ArenaWeapon | null;
+  side: "left" | "right";
+  active: boolean;
+  guarding: boolean;
+  hp: number;
+}) {
+  const normalizedAppearance = appearance ?? "centurion";
+  const normalizedWeapon = weapon ?? "gladius";
+
+  return (
+    <div
+      aria-hidden="true"
+      className={`arena-sprite arena-sprite-${side} arena-sprite-${normalizedAppearance} arena-sprite-weapon-${normalizedWeapon} ${active ? "arena-sprite-active" : ""} ${guarding ? "arena-sprite-guarding" : ""} ${hp <= 0 ? "arena-sprite-defeated" : ""}`}
+    >
+      <div className="arena-sprite-shadow" />
+      <div className="arena-sprite-body">
+        <div className="arena-sprite-plume" />
+        <div className="arena-sprite-head" />
+        <div className="arena-sprite-torso" />
+        <div className="arena-sprite-arm arena-sprite-arm-back" />
+        <div className="arena-sprite-arm arena-sprite-arm-front" />
+        <div className="arena-sprite-weapon">
+          <span className="arena-sprite-weapon-core" />
+        </div>
+        <div className="arena-sprite-shield" />
+        <div className="arena-sprite-leg arena-sprite-leg-back" />
+        <div className="arena-sprite-leg arena-sprite-leg-front" />
+      </div>
+    </div>
+  );
+}
+
 export default function ArenaPage() {
   const params = useParams<{ matchId: string }>();
   const matchId = typeof params.matchId === "string" ? params.matchId : "";
@@ -131,6 +172,23 @@ export default function ArenaPage() {
   const opponentWeapon = isPlayerOne ? (match?.playerTwoWeapon ?? null) : (match?.playerOneWeapon ?? null);
   const myTurn = match?.currentTurnUserId === session?.user.id;
   const winnerIsMe = match?.winnerUserId === session?.user.id;
+  const latestArenaEvent = match?.log.length ? match.log[match.log.length - 1] : null;
+  const arenaStatusTitle =
+    match?.status === "setup"
+      ? "Подготовка к дуэли"
+      : match?.status === "active"
+        ? myTurn
+          ? "Твой ход на арене"
+          : "Соперник готовит ход"
+        : winnerIsMe
+          ? "Ты забрал победу"
+          : "Соперник победил";
+  const arenaStatusText =
+    match?.status === "setup"
+      ? "Выбери облик и оружие. Как только оба бойца готовы, начнётся бой."
+      : match?.status === "active"
+        ? latestArenaEvent?.text ?? "Арена открыта. Следующий ход решит темп боя."
+        : latestArenaEvent?.text ?? "Бой завершён. Можно открыть чат и начать новый раунд.";
 
   useEffect(() => {
     if (!match) {
@@ -234,6 +292,19 @@ export default function ArenaPage() {
 
         {message ? <div className="toast-panel tg-chat-toast">{message}</div> : null}
 
+        <div className="arena-hero">
+          <div className="arena-hero-copy">
+            <span className="arena-hero-kicker">AmiGo Arena</span>
+            <h1>{arenaStatusTitle}</h1>
+            <p>{arenaStatusText}</p>
+          </div>
+
+          <div className="arena-hero-badges">
+            <span className="arena-hero-badge">{match.status === "setup" ? "Подбор снаряжения" : match.status === "active" ? "Живой бой" : "Результат"}</span>
+            <span className="arena-hero-badge">{myTurn ? "Инициатива у тебя" : "Инициатива у соперника"}</span>
+          </div>
+        </div>
+
         <div className="arena-board">
           <div className="arena-fighter arena-fighter-self">
             <div className="arena-fighter-head">
@@ -243,7 +314,16 @@ export default function ArenaPage() {
                 <span>{myAppearance.label}</span>
               </div>
             </div>
-            <div className="arena-fighter-visual">{myAppearance.icon}</div>
+            <div className="arena-fighter-visual">
+              <ArenaFighterSprite
+                active={match.status === "active" && myTurn}
+                appearance={isPlayerOne ? match?.playerOneAppearance : match?.playerTwoAppearance}
+                guarding={Boolean(isPlayerOne ? match?.playerOneGuarding : match?.playerTwoGuarding)}
+                hp={myHp ?? 0}
+                side="left"
+                weapon={myWeapon}
+              />
+            </div>
             <div className="arena-hp">
               <span>Здоровье</span>
               <div className="arena-hp-track">
@@ -254,6 +334,12 @@ export default function ArenaPage() {
             <div className="arena-fighter-meta">{getWeaponLabel(myWeapon)}</div>
           </div>
 
+          <div className="arena-board-center" aria-hidden="true">
+            <div className="arena-board-round">{match.status === "setup" ? "PREP" : match.status === "active" ? "DUEL" : "END"}</div>
+            <div className="arena-board-versus">VS</div>
+            <div className="arena-board-turn">{myTurn ? "Твой темп" : "Темп соперника"}</div>
+          </div>
+
           <div className="arena-fighter arena-fighter-opponent">
             <div className="arena-fighter-head">
               <UserAvatar name={friend?.profile.name ?? "Соперник"} size="sm" src={friend?.profile.avatar} />
@@ -262,7 +348,16 @@ export default function ArenaPage() {
                 <span>{opponentAppearance.label}</span>
               </div>
             </div>
-            <div className="arena-fighter-visual">{opponentAppearance.icon}</div>
+            <div className="arena-fighter-visual">
+              <ArenaFighterSprite
+                active={match.status === "active" && !myTurn}
+                appearance={isPlayerOne ? match?.playerTwoAppearance : match?.playerOneAppearance}
+                guarding={Boolean(isPlayerOne ? match?.playerTwoGuarding : match?.playerOneGuarding)}
+                hp={opponentHp ?? 0}
+                side="right"
+                weapon={opponentWeapon}
+              />
+            </div>
             <div className="arena-hp">
               <span>Здоровье</span>
               <div className="arena-hp-track">
@@ -271,6 +366,25 @@ export default function ArenaPage() {
               <strong>{opponentHp ?? 0}</strong>
             </div>
             <div className="arena-fighter-meta">{getWeaponLabel(opponentWeapon)}</div>
+          </div>
+        </div>
+
+        <div className="arena-hud">
+          <div className="arena-hud-chip">
+            <span>Твой боец</span>
+            <strong>{myAppearance.label}</strong>
+          </div>
+          <div className="arena-hud-chip">
+            <span>Твоё оружие</span>
+            <strong>{getWeaponLabel(myWeapon)}</strong>
+          </div>
+          <div className="arena-hud-chip">
+            <span>Соперник</span>
+            <strong>{opponentAppearance.label}</strong>
+          </div>
+          <div className="arena-hud-chip">
+            <span>Статус</span>
+            <strong>{match.status === "active" ? (myTurn ? "Ходишь ты" : "Ходит соперник") : match.status === "setup" ? "Ожидание готовности" : "Бой завершён"}</strong>
           </div>
         </div>
 

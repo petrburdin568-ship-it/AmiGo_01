@@ -1242,88 +1242,90 @@ export default function ChatPage() {
       ) : null}
 
       <section className="tg-chat-shell">
-        <div className="tg-chatbar">
-          <div className="tg-chatbar-main">
-            <Link className="tg-chatbar-back" href="/chats">
-              Назад
-            </Link>
+        <div className="tg-chat-top">
+          <div className="tg-chatbar">
+            <div className="tg-chatbar-main">
+              <Link className="tg-chatbar-back" href="/chats">
+                Назад
+              </Link>
 
-            <Link className="tg-chatbar-user" href={`/friends/${friend.friendshipId}`}>
-              <UserAvatar className="tg-chat-avatar" name={friend.profile.name} size="sm" src={friend.profile.avatar} />
-              <div className="tg-chatbar-copy">
-                <strong>{friend.profile.name}</strong>
-                <span>{getPresenceLabel(friend, otherTyping)}</span>
+              <Link className="tg-chatbar-user" href={`/friends/${friend.friendshipId}`}>
+                <UserAvatar className="tg-chat-avatar" name={friend.profile.name} size="sm" src={friend.profile.avatar} />
+                <div className="tg-chatbar-copy">
+                  <strong>{friend.profile.name}</strong>
+                  <span>{getPresenceLabel(friend, otherTyping)}</span>
+                </div>
+              </Link>
+            </div>
+
+            <div className="tg-chatbar-actions">
+              <span className="tg-chatbar-status">{getPresenceLabel(friend, otherTyping)}</span>
+              <Link className="tg-chatbar-profile" href={`/friends/${friend.friendshipId}`}>
+                Профиль
+              </Link>
+            </div>
+          </div>
+
+          {arenaInvite ? (
+            <div className="tg-arena-banner">
+              <div className="tg-arena-banner-copy">
+                <strong>
+                  {arenaInvite.status === "pending"
+                    ? isArenaSender
+                      ? "Вызов на арену отправлен"
+                      : "Тебя вызвали на арену"
+                    : arenaInvite.status === "accepted"
+                      ? "Арена готова"
+                      : arenaInvite.status === "declined"
+                        ? "Вызов на арену отклонён"
+                        : "Вызов на арену отменён"}
+                </strong>
+                <span>
+                  {arenaInvite.status === "pending"
+                    ? isArenaSender
+                      ? "Ждём, пока соперник примет дуэль."
+                      : "Прими вызов и подготовь своего бойца."
+                    : arenaInvite.status === "accepted"
+                      ? arenaMatch?.status === "finished"
+                        ? "Бой завершён. Результат всё ещё можно открыть."
+                        : "Открой арену и продолжай бой."
+                      : "Можно отправить новый вызов в любой момент."}
+                </span>
               </div>
-            </Link>
-          </div>
 
-          <div className="tg-chatbar-actions">
-            <span className="tg-chatbar-status">{getPresenceLabel(friend, otherTyping)}</span>
-            <Link className="tg-chatbar-profile" href={`/friends/${friend.friendshipId}`}>
-              Профиль
-            </Link>
-          </div>
+              <div className="tg-arena-banner-actions">
+                {arenaInvite.status === "pending" && isArenaRecipient ? (
+                  <>
+                    <button className="tg-arena-inline-action tg-arena-inline-action-primary" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("accepted")} type="button">
+                      Принять
+                    </button>
+                    <button className="tg-arena-inline-action" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("declined")} type="button">
+                      Отклонить
+                    </button>
+                  </>
+                ) : null}
+
+                {arenaInvite.status === "pending" && isArenaSender ? (
+                  <button className="tg-arena-inline-action" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("cancelled")} type="button">
+                    Отменить
+                  </button>
+                ) : null}
+
+                {arenaInvite.status === "accepted" && hasArenaMatch ? (
+                  <Link className="tg-arena-inline-action tg-arena-inline-action-primary" href={`/arena/${arenaInvite.arenaMatchId}`}>
+                    Открыть арену
+                  </Link>
+                ) : null}
+
+                {arenaInvite.status !== "pending" ? (
+                  <button className="tg-arena-inline-action" onClick={() => setArenaMenuOpen(true)} type="button">
+                    Новая дуэль
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
-
-        {arenaInvite ? (
-          <div className="tg-arena-banner">
-            <div className="tg-arena-banner-copy">
-              <strong>
-                {arenaInvite.status === "pending"
-                  ? isArenaSender
-                    ? "Вызов на арену отправлен"
-                    : "Тебя вызвали на арену"
-                  : arenaInvite.status === "accepted"
-                    ? "Арена готова"
-                    : arenaInvite.status === "declined"
-                      ? "Вызов на арену отклонён"
-                      : "Вызов на арену отменён"}
-              </strong>
-              <span>
-                {arenaInvite.status === "pending"
-                  ? isArenaSender
-                    ? "Ждём, пока соперник примет дуэль."
-                    : "Прими вызов и подготовь своего бойца."
-                  : arenaInvite.status === "accepted"
-                    ? arenaMatch?.status === "finished"
-                      ? "Бой завершён. Результат всё ещё можно открыть."
-                      : "Открой арену и продолжай бой."
-                    : "Можно отправить новый вызов в любой момент."}
-              </span>
-            </div>
-
-            <div className="tg-arena-banner-actions">
-              {arenaInvite.status === "pending" && isArenaRecipient ? (
-                <>
-                  <button className="tg-arena-inline-action tg-arena-inline-action-primary" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("accepted")} type="button">
-                    Принять
-                  </button>
-                  <button className="tg-arena-inline-action" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("declined")} type="button">
-                    Отклонить
-                  </button>
-                </>
-              ) : null}
-
-              {arenaInvite.status === "pending" && isArenaSender ? (
-                <button className="tg-arena-inline-action" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("cancelled")} type="button">
-                  Отменить
-                </button>
-              ) : null}
-
-              {arenaInvite.status === "accepted" && hasArenaMatch ? (
-                <Link className="tg-arena-inline-action tg-arena-inline-action-primary" href={`/arena/${arenaInvite.arenaMatchId}`}>
-                  Открыть арену
-                </Link>
-              ) : null}
-
-              {arenaInvite.status !== "pending" ? (
-                <button className="tg-arena-inline-action" onClick={() => setArenaMenuOpen(true)} type="button">
-                  Новая дуэль
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
 
         <div className="tg-chat-messages">
           <div className="tg-service-badge">Сегодня</div>
