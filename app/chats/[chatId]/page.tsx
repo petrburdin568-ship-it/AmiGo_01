@@ -19,12 +19,16 @@ import { useAuth } from "@/components/auth-provider";
 import { UserAvatar } from "@/components/user-avatar";
 import {
   appendIncomingMessage,
+  createArenaInvite,
+  getArenaMatch,
+  getLatestArenaInvite,
   deleteMessageForEveryone,
   forwardMessage,
   getFriendshipDetails,
   listFriends,
   listMessages,
   markFriendshipRead,
+  respondArenaInvite,
   sendImageMessage,
   sendMessage,
   sendStickerMessage,
@@ -34,7 +38,13 @@ import {
 } from "@/lib/supabase/queries";
 import type { MessageRow } from "@/lib/supabase/types";
 import { getStickerByValue, STICKER_OPTIONS } from "@/lib/stickers";
-import type { ChatMessage, ChatMessageReply, FriendRecord } from "@/lib/types";
+import type {
+  ArenaInvite,
+  ArenaMatch,
+  ChatMessage,
+  ChatMessageReply,
+  FriendRecord
+} from "@/lib/types";
 
 type MediaPreviewState = { url: string; type: "image" | "video" } | null;
 type RecordingKind = "voice" | "video-note" | null;
@@ -186,6 +196,10 @@ export default function ChatPage() {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [cameraPreviewStream, setCameraPreviewStream] = useState<MediaStream | null>(null);
   const [cameraFacingMode, setCameraFacingMode] = useState<"user" | "environment">("user");
+  const [arenaInvite, setArenaInvite] = useState<ArenaInvite | null>(null);
+  const [arenaMatch, setArenaMatch] = useState<ArenaMatch | null>(null);
+  const [arenaMenuOpen, setArenaMenuOpen] = useState(false);
+  const [arenaBusy, setArenaBusy] = useState(false);
 
   const messages = useMemo(() => {
     const messageMap = new Map(rawMessages.map((item) => [item.id, item]));
@@ -239,6 +253,8 @@ export default function ChatPage() {
     if (!session || !chatId) {
       setFriend(null);
       setRawMessages([]);
+      setArenaInvite(null);
+      setArenaMatch(null);
       return;
     }
 
@@ -275,6 +291,83 @@ export default function ChatPage() {
 
     return () => {
       active = false;
+    };
+  }, [chatId, session, supabase]);
+
+  useEffect(() => {
+    if (!session || !chatId) {
+      setArenaInvite(null);
+      setArenaMatch(null);
+      return;
+    }
+
+    let active = true;
+
+    async function loadArenaState() {
+      try {
+        const latestInvite = await getLatestArenaInvite(supabase, chatId);
+        if (!active) {
+          return;
+        }
+
+        setArenaInvite(latestInvite);
+
+        if (latestInvite?.arenaMatchId) {
+          const nextMatch = await getArenaMatch(supabase, latestInvite.arenaMatchId);
+          if (!active) {
+            return;
+          }
+
+          setArenaMatch(nextMatch);
+        } else {
+          setArenaMatch(null);
+        }
+      } catch {
+        if (active) {
+          setArenaInvite(null);
+          setArenaMatch(null);
+        }
+      }
+    }
+
+    void loadArenaState();
+
+    const invitesChannel = supabase
+      .channel(`arena-invites:${chatId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "arena_invites",
+          filter: `friendship_id=eq.${chatId}`
+        },
+        () => {
+          void loadArenaState();
+        }
+      )
+      .subscribe();
+
+    const matchesChannel = supabase
+      .channel(`arena-matches:${chatId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "arena_matches",
+          filter: `friendship_id=eq.${chatId}`
+        },
+        () => {
+          void loadArenaState();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      void supabase.removeChannel(invitesChannel);
+      void supabase.removeChannel(matchesChannel);
     };
   }, [chatId, session, supabase]);
 
@@ -885,6 +978,51 @@ export default function ChatPage() {
     }
   }
 
+  async function handleCreateArenaInvite() {
+    if (!session) {
+      return;
+    }
+
+    setArenaBusy(true);
+    setMessage("");
+
+    try {
+      const invite = await createArenaInvite(supabase, chatId);
+      setArenaInvite(invite);
+      setArenaMenuOpen(false);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to send arena invite.");
+    } finally {
+      setArenaBusy(false);
+    }
+  }
+
+  async function handleArenaInviteResponse(nextStatus: "accepted" | "declined" | "cancelled") {
+    if (!arenaInvite) {
+      return;
+    }
+
+    setArenaBusy(true);
+    setMessage("");
+
+    try {
+      const invite = await respondArenaInvite(supabase, arenaInvite.id, nextStatus);
+      setArenaInvite(invite);
+      if (invite.arenaMatchId) {
+        const match = await getArenaMatch(supabase, invite.arenaMatchId);
+        setArenaMatch(match);
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to update arena invite.");
+    } finally {
+      setArenaBusy(false);
+    }
+  }
+
+  const isArenaSender = arenaInvite?.senderId === session?.user.id;
+  const isArenaRecipient = arenaInvite?.recipientId === session?.user.id;
+  const hasArenaMatch = Boolean(arenaInvite?.arenaMatchId);
+
   if (!session && !loading) {
     return (
       <AppShell mode="plain" title="Чат" description="">
@@ -1008,6 +1146,27 @@ export default function ChatPage() {
         </div>
       ) : null}
 
+      {arenaMenuOpen ? (
+        <div className="tg-forward-overlay" onClick={() => (arenaBusy ? undefined : setArenaMenuOpen(false))} role="dialog">
+          <div className="tg-forward-sheet tg-arena-sheet" onClick={(event) => event.stopPropagation()}>
+            <div className="tg-forward-head">
+              <strong>Arena</strong>
+              <button className="tg-forward-close" onClick={() => setArenaMenuOpen(false)} type="button">
+                ×
+              </button>
+            </div>
+
+            <div className="tg-arena-sheet-copy">
+              <p>Challenge your chat partner, choose a fighter and weapon, then fight in a quick turn-based duel.</p>
+            </div>
+
+            <button className="button button-primary tg-arena-call" disabled={arenaBusy} onClick={() => void handleCreateArenaInvite()} type="button">
+              {arenaBusy ? "Sending..." : "Challenge to arena"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {recordingKind === "video-note" ? (
         <div className="tg-video-note-recorder" role="dialog">
           <div className="tg-video-note-recorder-surface">
@@ -1059,6 +1218,66 @@ export default function ChatPage() {
             </Link>
           </div>
         </div>
+
+        {arenaInvite ? (
+          <div className="tg-arena-banner">
+            <div className="tg-arena-banner-copy">
+              <strong>
+                {arenaInvite.status === "pending"
+                  ? isArenaSender
+                    ? "Arena challenge sent"
+                    : "Incoming arena challenge"
+                  : arenaInvite.status === "accepted"
+                    ? "Arena ready"
+                    : arenaInvite.status === "declined"
+                      ? "Arena challenge declined"
+                      : "Arena challenge cancelled"}
+              </strong>
+              <span>
+                {arenaInvite.status === "pending"
+                  ? isArenaSender
+                    ? "Waiting for the opponent to accept the duel."
+                    : "Accept the challenge and prepare your fighter."
+                  : arenaInvite.status === "accepted"
+                    ? arenaMatch?.status === "finished"
+                      ? "The duel is finished. You can still open the result."
+                      : "Open the arena and continue the fight."
+                    : "You can start a new duel whenever you want."}
+              </span>
+            </div>
+
+            <div className="tg-arena-banner-actions">
+              {arenaInvite.status === "pending" && isArenaRecipient ? (
+                <>
+                  <button className="tg-arena-inline-action tg-arena-inline-action-primary" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("accepted")} type="button">
+                    Accept
+                  </button>
+                  <button className="tg-arena-inline-action" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("declined")} type="button">
+                    Decline
+                  </button>
+                </>
+              ) : null}
+
+              {arenaInvite.status === "pending" && isArenaSender ? (
+                <button className="tg-arena-inline-action" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("cancelled")} type="button">
+                  Cancel
+                </button>
+              ) : null}
+
+              {arenaInvite.status === "accepted" && hasArenaMatch ? (
+                <Link className="tg-arena-inline-action tg-arena-inline-action-primary" href={`/arena/${arenaInvite.arenaMatchId}`}>
+                  Open arena
+                </Link>
+              ) : null}
+
+              {arenaInvite.status !== "pending" ? (
+                <button className="tg-arena-inline-action" onClick={() => setArenaMenuOpen(true)} type="button">
+                  New duel
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         <div className="tg-chat-messages">
           <div className="tg-service-badge">Сегодня</div>
@@ -1218,6 +1437,15 @@ export default function ChatPage() {
           ) : null}
 
           <input accept="image/*,video/*" className="tg-file-input" onChange={handleMediaSelect} ref={fileInputRef} type="file" />
+
+          <button
+            aria-label="Open arena"
+            className={`tg-compose-icon tg-compose-swords ${arenaInvite?.status === "pending" ? "tg-compose-icon-active" : ""}`}
+            onClick={() => setArenaMenuOpen(true)}
+            type="button"
+          >
+            ⚔
+          </button>
 
           <button
             aria-label="Открыть меню вложений"

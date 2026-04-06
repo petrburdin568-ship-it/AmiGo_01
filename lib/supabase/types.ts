@@ -1,4 +1,11 @@
 import type {
+  ArenaAppearance,
+  ArenaInvite,
+  ArenaInviteStatus,
+  ArenaLogEntry,
+  ArenaMatch,
+  ArenaMatchStatus,
+  ArenaWeapon,
   Capability,
   ChatMessage,
   CommunicationFormat,
@@ -79,6 +86,40 @@ export type FriendRequestRow = {
   requester_id: string;
   recipient_id: string;
   status: "pending" | "accepted" | "declined" | "cancelled";
+  created_at: string;
+  updated_at: string;
+};
+
+export type ArenaInviteRow = {
+  id: string;
+  friendship_id: string;
+  sender_id: string;
+  recipient_id: string;
+  status: ArenaInviteStatus;
+  arena_match_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ArenaMatchRow = {
+  id: string;
+  friendship_id: string;
+  player_one_id: string;
+  player_two_id: string;
+  status: ArenaMatchStatus;
+  current_turn_user_id: string | null;
+  winner_user_id: string | null;
+  player_one_hp: number;
+  player_two_hp: number;
+  player_one_appearance: ArenaAppearance | null;
+  player_two_appearance: ArenaAppearance | null;
+  player_one_weapon: ArenaWeapon | null;
+  player_two_weapon: ArenaWeapon | null;
+  player_one_ready: boolean;
+  player_two_ready: boolean;
+  player_one_guarding: boolean;
+  player_two_guarding: boolean;
+  log: ArenaLogEntry[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -205,5 +246,42 @@ export function mapPresenceRow(row: UserPresenceRow | null | undefined): FriendP
   return {
     isOnline: row?.is_online === true,
     lastSeenAt: row?.last_seen_at ?? null
+  };
+}
+
+export function mapArenaInviteRow(row: ArenaInviteRow): ArenaInvite {
+  return {
+    id: row.id,
+    friendshipId: row.friendship_id,
+    senderId: row.sender_id,
+    recipientId: row.recipient_id,
+    status: row.status,
+    arenaMatchId: row.arena_match_id,
+    createdAt: row.created_at
+  };
+}
+
+export function mapArenaMatchRow(row: ArenaMatchRow): ArenaMatch {
+  return {
+    id: row.id,
+    friendshipId: row.friendship_id,
+    playerOneId: row.player_one_id,
+    playerTwoId: row.player_two_id,
+    status: row.status,
+    currentTurnUserId: row.current_turn_user_id,
+    winnerUserId: row.winner_user_id,
+    playerOneHp: row.player_one_hp,
+    playerTwoHp: row.player_two_hp,
+    playerOneAppearance: row.player_one_appearance,
+    playerTwoAppearance: row.player_two_appearance,
+    playerOneWeapon: row.player_one_weapon,
+    playerTwoWeapon: row.player_two_weapon,
+    playerOneReady: row.player_one_ready,
+    playerTwoReady: row.player_two_ready,
+    playerOneGuarding: row.player_one_guarding,
+    playerTwoGuarding: row.player_two_guarding,
+    log: row.log ?? [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }

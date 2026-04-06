@@ -1,6 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ChatMessage, FriendRecord, FriendRequestRecord, UserProfile } from "@/lib/types";
+import type {
+  ArenaAction,
+  ArenaAppearance,
+  ArenaWeapon,
+  ChatMessage,
+  FriendRecord,
+  FriendRequestRecord,
+  UserProfile
+} from "@/lib/types";
 import {
+  type ArenaInviteRow,
+  type ArenaMatchRow,
   type FriendRequestRow,
   type FriendshipMemberRow,
   type FriendshipRow,
@@ -8,6 +18,8 @@ import {
   type ProfileRow,
   type PublicProfileRow,
   type UserPresenceRow,
+  mapArenaInviteRow,
+  mapArenaMatchRow,
   mapFriendRecord,
   mapFriendRequestRecord,
   mapMessageRow,
@@ -632,6 +644,93 @@ export async function forwardMessage(
     reply_to_message_id: null,
     forwarded_from_message_id: message.id
   });
+}
+
+export async function getLatestArenaInvite(supabase: SupabaseClient, friendshipId: string) {
+  const { data, error } = await supabase
+    .from("arena_invites")
+    .select("*")
+    .eq("friendship_id", friendshipId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapArenaInviteRow(data as ArenaInviteRow) : null;
+}
+
+export async function createArenaInvite(supabase: SupabaseClient, friendshipId: string) {
+  const { data, error } = await supabase.rpc("create_arena_invite", {
+    target_friendship: friendshipId
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return mapArenaInviteRow(data as ArenaInviteRow);
+}
+
+export async function respondArenaInvite(
+  supabase: SupabaseClient,
+  inviteId: string,
+  nextStatus: "accepted" | "declined" | "cancelled"
+) {
+  const { data, error } = await supabase.rpc("respond_arena_invite", {
+    target_invite: inviteId,
+    next_status: nextStatus
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return mapArenaInviteRow(data as ArenaInviteRow);
+}
+
+export async function getArenaMatch(supabase: SupabaseClient, matchId: string) {
+  const { data, error } = await supabase.from("arena_matches").select("*").eq("id", matchId).maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapArenaMatchRow(data as ArenaMatchRow) : null;
+}
+
+export async function saveArenaLoadout(
+  supabase: SupabaseClient,
+  matchId: string,
+  appearance: ArenaAppearance,
+  weapon: ArenaWeapon
+) {
+  const { data, error } = await supabase.rpc("submit_arena_loadout", {
+    target_match: matchId,
+    next_appearance: appearance,
+    next_weapon: weapon
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return mapArenaMatchRow(data as ArenaMatchRow);
+}
+
+export async function performArenaAction(supabase: SupabaseClient, matchId: string, nextAction: ArenaAction) {
+  const { data, error } = await supabase.rpc("perform_arena_action", {
+    target_match: matchId,
+    next_action: nextAction
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return mapArenaMatchRow(data as ArenaMatchRow);
 }
 
 export function appendIncomingMessage(current: ChatMessage[], row: MessageRow, currentUserId: string) {
