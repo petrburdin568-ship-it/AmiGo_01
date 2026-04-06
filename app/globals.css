@@ -2490,6 +2490,7 @@ body[data-theme="dark"] .tg-chat-shell {
   position: fixed;
   inset: 0;
   z-index: 129;
+  padding: 12px;
 }
 
 .tg-context-item {
@@ -5189,7 +5190,12 @@ body[data-theme="dark"] .tg-chat-shell {
   }
 
   .tg-context-menu {
-    min-width: 164px;
+    left: 12px !important;
+    right: 12px;
+    top: auto !important;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    min-width: 0;
+    width: auto;
   }
 
   .tg-media-viewer-surface {

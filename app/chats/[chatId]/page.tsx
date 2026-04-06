@@ -69,6 +69,10 @@ type PresenceMeta = {
   typing?: boolean;
 };
 
+const CONTEXT_MENU_MARGIN = 12;
+const CONTEXT_MENU_FALLBACK_WIDTH = 196;
+const CONTEXT_MENU_FALLBACK_HEIGHT = 208;
+
 function formatMessageTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -158,6 +162,20 @@ function formatRecordingTime(seconds: number) {
     .toString()
     .padStart(2, "0");
   return `${mins}:${secs}`;
+}
+
+function clampContextMenuPosition(x: number, y: number, width: number, height: number) {
+  if (typeof window === "undefined") {
+    return { x, y };
+  }
+
+  const maxX = Math.max(CONTEXT_MENU_MARGIN, window.innerWidth - width - CONTEXT_MENU_MARGIN);
+  const maxY = Math.max(CONTEXT_MENU_MARGIN, window.innerHeight - height - CONTEXT_MENU_MARGIN);
+
+  return {
+    x: Math.min(Math.max(CONTEXT_MENU_MARGIN, x), maxX),
+    y: Math.min(Math.max(CONTEXT_MENU_MARGIN, y), maxY)
+  };
 }
 
 export default function ChatPage() {
@@ -491,6 +509,27 @@ export default function ChatPage() {
   }, [contextMenu]);
 
   useEffect(() => {
+    if (!contextMenu || !contextMenuRef.current) {
+      return;
+    }
+
+    const menuRect = contextMenuRef.current.getBoundingClientRect();
+    const nextPosition = clampContextMenuPosition(contextMenu.x, contextMenu.y, menuRect.width, menuRect.height);
+
+    if (nextPosition.x !== contextMenu.x || nextPosition.y !== contextMenu.y) {
+      setContextMenu((current) =>
+        current
+          ? {
+              ...current,
+              x: nextPosition.x,
+              y: nextPosition.y
+            }
+          : current
+      );
+    }
+  }, [contextMenu]);
+
+  useEffect(() => {
     return () => {
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
@@ -740,11 +779,18 @@ export default function ChatPage() {
   }
 
   function openContextMenuAt(x: number, y: number, item: ChatMessage) {
+    const nextPosition = clampContextMenuPosition(
+      x,
+      y,
+      CONTEXT_MENU_FALLBACK_WIDTH,
+      CONTEXT_MENU_FALLBACK_HEIGHT
+    );
+
     setContextMenu({
       messageId: item.id,
       sender: item.sender,
-      x,
-      y,
+      x: nextPosition.x,
+      y: nextPosition.y,
       text: item.text,
       type: item.type,
       mediaUrl: item.mediaUrl
@@ -991,7 +1037,7 @@ export default function ChatPage() {
       setArenaInvite(invite);
       setArenaMenuOpen(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to send arena invite.");
+      setMessage(error instanceof Error ? error.message : "Не удалось отправить вызов на арену.");
     } finally {
       setArenaBusy(false);
     }
@@ -1013,7 +1059,7 @@ export default function ChatPage() {
         setArenaMatch(match);
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to update arena invite.");
+      setMessage(error instanceof Error ? error.message : "Не удалось обновить приглашение на арену.");
     } finally {
       setArenaBusy(false);
     }
@@ -1150,18 +1196,18 @@ export default function ChatPage() {
         <div className="tg-forward-overlay" onClick={() => (arenaBusy ? undefined : setArenaMenuOpen(false))} role="dialog">
           <div className="tg-forward-sheet tg-arena-sheet" onClick={(event) => event.stopPropagation()}>
             <div className="tg-forward-head">
-              <strong>Arena</strong>
+              <strong>Арена</strong>
               <button className="tg-forward-close" onClick={() => setArenaMenuOpen(false)} type="button">
                 ×
               </button>
             </div>
 
             <div className="tg-arena-sheet-copy">
-              <p>Challenge your chat partner, choose a fighter and weapon, then fight in a quick turn-based duel.</p>
+              <p>Вызови собеседника на дуэль. После принятия приглашения вы оба настроите бойца и начнёте пошаговый бой.</p>
             </div>
 
             <button className="button button-primary tg-arena-call" disabled={arenaBusy} onClick={() => void handleCreateArenaInvite()} type="button">
-              {arenaBusy ? "Sending..." : "Challenge to arena"}
+              {arenaBusy ? "Отправляем..." : "Вызвать на арену"}
             </button>
           </div>
         </div>
@@ -1225,24 +1271,24 @@ export default function ChatPage() {
               <strong>
                 {arenaInvite.status === "pending"
                   ? isArenaSender
-                    ? "Arena challenge sent"
-                    : "Incoming arena challenge"
+                    ? "Вызов на арену отправлен"
+                    : "Тебя вызвали на арену"
                   : arenaInvite.status === "accepted"
-                    ? "Arena ready"
+                    ? "Арена готова"
                     : arenaInvite.status === "declined"
-                      ? "Arena challenge declined"
-                      : "Arena challenge cancelled"}
+                      ? "Вызов на арену отклонён"
+                      : "Вызов на арену отменён"}
               </strong>
               <span>
                 {arenaInvite.status === "pending"
                   ? isArenaSender
-                    ? "Waiting for the opponent to accept the duel."
-                    : "Accept the challenge and prepare your fighter."
+                    ? "Ждём, пока соперник примет дуэль."
+                    : "Прими вызов и подготовь своего бойца."
                   : arenaInvite.status === "accepted"
                     ? arenaMatch?.status === "finished"
-                      ? "The duel is finished. You can still open the result."
-                      : "Open the arena and continue the fight."
-                    : "You can start a new duel whenever you want."}
+                      ? "Бой завершён. Результат всё ещё можно открыть."
+                      : "Открой арену и продолжай бой."
+                    : "Можно отправить новый вызов в любой момент."}
               </span>
             </div>
 
@@ -1250,29 +1296,29 @@ export default function ChatPage() {
               {arenaInvite.status === "pending" && isArenaRecipient ? (
                 <>
                   <button className="tg-arena-inline-action tg-arena-inline-action-primary" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("accepted")} type="button">
-                    Accept
+                    Принять
                   </button>
                   <button className="tg-arena-inline-action" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("declined")} type="button">
-                    Decline
+                    Отклонить
                   </button>
                 </>
               ) : null}
 
               {arenaInvite.status === "pending" && isArenaSender ? (
                 <button className="tg-arena-inline-action" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("cancelled")} type="button">
-                  Cancel
+                  Отменить
                 </button>
               ) : null}
 
               {arenaInvite.status === "accepted" && hasArenaMatch ? (
                 <Link className="tg-arena-inline-action tg-arena-inline-action-primary" href={`/arena/${arenaInvite.arenaMatchId}`}>
-                  Open arena
+                  Открыть арену
                 </Link>
               ) : null}
 
               {arenaInvite.status !== "pending" ? (
                 <button className="tg-arena-inline-action" onClick={() => setArenaMenuOpen(true)} type="button">
-                  New duel
+                  Новая дуэль
                 </button>
               ) : null}
             </div>
@@ -1439,7 +1485,7 @@ export default function ChatPage() {
           <input accept="image/*,video/*" className="tg-file-input" onChange={handleMediaSelect} ref={fileInputRef} type="file" />
 
           <button
-            aria-label="Open arena"
+            aria-label="Открыть арену"
             className={`tg-compose-icon tg-compose-swords ${arenaInvite?.status === "pending" ? "tg-compose-icon-active" : ""}`}
             onClick={() => setArenaMenuOpen(true)}
             type="button"

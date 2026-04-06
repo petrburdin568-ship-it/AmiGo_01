@@ -16,23 +16,23 @@ import {
 import type { ArenaAction, ArenaAppearance, ArenaMatch, ArenaWeapon, FriendRecord } from "@/lib/types";
 
 const APPEARANCES: { value: ArenaAppearance; label: string; icon: string }[] = [
-  { value: "centurion", label: "Centurion", icon: "⚔" },
-  { value: "hoplite", label: "Hoplite", icon: "🛡" },
-  { value: "knight", label: "Knight", icon: "♞" },
-  { value: "raider", label: "Raider", icon: "☠" }
+  { value: "centurion", label: "Центурион", icon: "⚔" },
+  { value: "hoplite", label: "Гоплит", icon: "🛡" },
+  { value: "knight", label: "Рыцарь", icon: "♞" },
+  { value: "raider", label: "Налётчик", icon: "☠" }
 ];
 
 const WEAPONS: { value: ArenaWeapon; label: string }[] = [
-  { value: "gladius", label: "Gladius" },
-  { value: "spear", label: "Spear" },
-  { value: "axe", label: "Axe" },
-  { value: "longsword", label: "Longsword" }
+  { value: "gladius", label: "Гладиус" },
+  { value: "spear", label: "Копьё" },
+  { value: "axe", label: "Топор" },
+  { value: "longsword", label: "Длинный меч" }
 ];
 
 const ACTIONS: { value: ArenaAction; label: string; note: string }[] = [
-  { value: "quick", label: "Quick strike", note: "Fast and consistent damage." },
-  { value: "heavy", label: "Heavy strike", note: "Higher damage, slower feel." },
-  { value: "guard", label: "Guard", note: "Reduce the next incoming hit." }
+  { value: "quick", label: "Быстрый удар", note: "Быстрый и стабильный урон." },
+  { value: "heavy", label: "Тяжёлый удар", note: "Больше урона, но грубее ход." },
+  { value: "guard", label: "Блок", note: "Снижает следующий входящий урон." }
 ];
 
 function getAppearanceMeta(value: ArenaAppearance | null) {
@@ -40,7 +40,7 @@ function getAppearanceMeta(value: ArenaAppearance | null) {
 }
 
 function getWeaponLabel(value: ArenaWeapon | null) {
-  return WEAPONS.find((item) => item.value === value)?.label ?? "Unarmed";
+  return WEAPONS.find((item) => item.value === value)?.label ?? "Без оружия";
 }
 
 export default function ArenaPage() {
@@ -87,7 +87,7 @@ export default function ArenaPage() {
         setFriend(nextFriend);
       } catch (error) {
         if (active) {
-          setMessage(error instanceof Error ? error.message : "Failed to load arena.");
+          setMessage(error instanceof Error ? error.message : "Не удалось загрузить арену.");
         }
       }
     }
@@ -159,7 +159,7 @@ export default function ArenaPage() {
       const nextMatch = await saveArenaLoadout(supabase, match.id, appearance, weapon);
       setMatch(nextMatch);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to save fighter.");
+      setMessage(error instanceof Error ? error.message : "Не удалось сохранить бойца.");
     } finally {
       setBusy(false);
     }
@@ -177,7 +177,7 @@ export default function ArenaPage() {
       const nextMatch = await performArenaAction(supabase, match.id, nextAction);
       setMatch(nextMatch);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to make arena move.");
+      setMessage(error instanceof Error ? error.message : "Не удалось выполнить ход на арене.");
     } finally {
       setBusy(false);
     }
@@ -185,11 +185,11 @@ export default function ArenaPage() {
 
   if (!session && !loading) {
     return (
-      <AppShell mode="plain" title="Arena" description="">
+      <AppShell mode="plain" title="Арена" description="">
         <section className="stack-lg">
           <div className="reference-bottom-action reference-bottom-action-left">
             <Link className="button button-primary" href="/auth">
-              Sign in
+              Войти
             </Link>
           </div>
         </section>
@@ -199,12 +199,12 @@ export default function ArenaPage() {
 
   if (!match) {
     return (
-      <AppShell mode="plain" title="Arena" description="">
+      <AppShell mode="plain" title="Арена" description="">
         <section className="stack-lg">
           {message ? <div className="reference-sheet-message">{message}</div> : null}
           <div className="reference-bottom-action reference-bottom-action-left">
             <Link className="button button-primary" href="/chats">
-              Back to chats
+              Назад к чатам
             </Link>
           </div>
         </section>
@@ -213,14 +213,22 @@ export default function ArenaPage() {
   }
 
   return (
-    <AppShell mode="plain" title="Arena" description="">
+    <AppShell mode="plain" title="Арена" description="">
       <section className="arena-page">
         <div className="arena-topbar">
           <Link className="tg-chatbar-back" href={`/chats/${match.friendshipId}`}>
-            Back to chat
+            Назад в чат
           </Link>
           <span className="arena-topbar-status">
-            {match.status === "setup" ? "Preparation" : match.status === "active" ? (myTurn ? "Your turn" : "Opponent turn") : winnerIsMe ? "Victory" : "Defeat"}
+            {match.status === "setup"
+              ? "Подготовка"
+              : match.status === "active"
+                ? myTurn
+                  ? "Твой ход"
+                  : "Ход соперника"
+                : winnerIsMe
+                  ? "Победа"
+                  : "Поражение"}
           </span>
         </div>
 
@@ -231,13 +239,13 @@ export default function ArenaPage() {
             <div className="arena-fighter-head">
               <UserAvatar name={session?.user.email ?? "You"} size="sm" src={session?.user.user_metadata?.avatar_url as string | undefined} />
               <div>
-                <strong>You</strong>
+                <strong>Ты</strong>
                 <span>{myAppearance.label}</span>
               </div>
             </div>
             <div className="arena-fighter-visual">{myAppearance.icon}</div>
             <div className="arena-hp">
-              <span>HP</span>
+              <span>Здоровье</span>
               <div className="arena-hp-track">
                 <div className="arena-hp-fill" style={{ width: `${Math.max(0, Math.min(100, myHp ?? 0))}%` }} />
               </div>
@@ -248,15 +256,15 @@ export default function ArenaPage() {
 
           <div className="arena-fighter arena-fighter-opponent">
             <div className="arena-fighter-head">
-              <UserAvatar name={friend?.profile.name ?? "Opponent"} size="sm" src={friend?.profile.avatar} />
+              <UserAvatar name={friend?.profile.name ?? "Соперник"} size="sm" src={friend?.profile.avatar} />
               <div>
-                <strong>{friend?.profile.name ?? "Opponent"}</strong>
+                <strong>{friend?.profile.name ?? "Соперник"}</strong>
                 <span>{opponentAppearance.label}</span>
               </div>
             </div>
             <div className="arena-fighter-visual">{opponentAppearance.icon}</div>
             <div className="arena-hp">
-              <span>HP</span>
+              <span>Здоровье</span>
               <div className="arena-hp-track">
                 <div className="arena-hp-fill" style={{ width: `${Math.max(0, Math.min(100, opponentHp ?? 0))}%` }} />
               </div>
@@ -269,13 +277,13 @@ export default function ArenaPage() {
         {match.status === "setup" ? (
           <div className="arena-setup">
             <div className="arena-setup-copy">
-              <h1>Prepare your fighter</h1>
-              <p>Choose appearance and weapon. The duel starts as soon as both players are ready.</p>
+              <h1>Подготовь бойца</h1>
+              <p>Выбери внешний вид и оружие. Дуэль начнётся, как только оба игрока будут готовы.</p>
             </div>
 
             <div className="arena-setup-grid">
               <div className="arena-setup-block">
-                <span>Appearance</span>
+                <span>Внешность</span>
                 <div className="arena-chip-grid">
                   {APPEARANCES.map((item) => (
                     <button
@@ -292,7 +300,7 @@ export default function ArenaPage() {
               </div>
 
               <div className="arena-setup-block">
-                <span>Weapon</span>
+                <span>Оружие</span>
                 <div className="arena-chip-grid arena-chip-grid-compact">
                   {WEAPONS.map((item) => (
                     <button
@@ -309,12 +317,12 @@ export default function ArenaPage() {
             </div>
 
             <div className="arena-ready-strip">
-              <span>{myReady ? "You are ready." : "You are not ready yet."}</span>
-              <span>{opponentReady ? "Opponent is ready." : "Opponent is still preparing."}</span>
+              <span>{myReady ? "Ты готов." : "Ты ещё не готов."}</span>
+              <span>{opponentReady ? "Соперник готов." : "Соперник ещё готовится."}</span>
             </div>
 
             <button className="button button-primary arena-ready-button" disabled={busy} onClick={() => void handleSaveLoadout()} type="button">
-              {busy ? "Saving..." : myReady ? "Update loadout" : "Ready for battle"}
+              {busy ? "Сохраняем..." : myReady ? "Обновить снаряжение" : "Готов к бою"}
             </button>
           </div>
         ) : null}
@@ -338,8 +346,8 @@ export default function ArenaPage() {
 
             <div className="arena-log">
               <div className="arena-log-head">
-                <strong>Combat log</strong>
-                <span>{myTurn ? "Make your move." : "Waiting for the opponent."}</span>
+                <strong>Ход боя</strong>
+                <span>{myTurn ? "Делай ход." : "Ждём ход соперника."}</span>
               </div>
               <div className="arena-log-list">
                 {match.log.map((entry, index) => (
@@ -355,10 +363,10 @@ export default function ArenaPage() {
 
         {match.status === "finished" ? (
           <div className="arena-finish">
-            <h1>{winnerIsMe ? "You won the duel" : `${friend?.profile.name ?? "Opponent"} won the duel`}</h1>
-            <p>Open the chat to start another round or send a new arena challenge.</p>
+            <h1>{winnerIsMe ? "Ты победил в дуэли" : `${friend?.profile.name ?? "Соперник"} победил в дуэли`}</h1>
+            <p>Открой чат, чтобы начать новый раунд или снова вызвать собеседника на арену.</p>
             <Link className="button button-primary" href={`/chats/${match.friendshipId}`}>
-              Return to chat
+              Вернуться в чат
             </Link>
           </div>
         ) : null}
