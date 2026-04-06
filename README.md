@@ -65,6 +65,42 @@ npm.cmd run dev -- --hostname 0.0.0.0 --port 3000
 - Deploy Next.js on Vercel: [vercel.com/docs/frameworks/full-stack/nextjs](https://vercel.com/docs/frameworks/full-stack/nextjs)
 - Vercel environment variables: [vercel.com/docs/environment-variables](https://vercel.com/docs/environment-variables)
 
+## APK для Android
+
+Проект уже подготовлен под Android через `Capacitor`.
+
+Важно:
+
+- текущая Android-версия открывает прод-сайт `https://ami-go-01.vercel.app` внутри приложения;
+- это быстрый путь к APK без переписывания всего фронтенда;
+- если сайт без VPN недоступен, APK тоже будет упираться в тот же адрес.
+
+Основные файлы:
+
+- `capacitor.config.ts`
+- `android/`
+
+Команды:
+
+```powershell
+cd C:\Users\Petr\Documents\AmiGo
+npm.cmd run android:sync
+npm.cmd run android:open
+```
+
+Дальше в `Android Studio`:
+
+1. дождаться Gradle Sync
+2. выбрать `Build > Build Bundle(s) / APK(s) > Build APK(s)`
+3. забрать готовый `.apk` из Android Studio
+
+Если позже захотим более нативную сборку, можно будет:
+
+1. перевести часть функций на Capacitor plugins
+2. добавить push-уведомления
+3. сделать локальные Android splash/icon
+4. уйти с remote URL на встроенную web-сборку или другой хостинг
+
 ## Что проверить после релиза
 
 1. Регистрация нового пользователя.
