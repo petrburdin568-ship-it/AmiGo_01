@@ -188,27 +188,28 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          <div className="reference-profile-hero reference-profile-hero-sheet">
-            <div className="reference-profile-left">
+          <div className="reference-profile-hero reference-profile-hero-sheet profile-mobile-hero">
+            <div className="reference-profile-left profile-mobile-left">
               <UserAvatar className="profile-sheet-avatar" name={form.name || "AmiGo"} size="lg" src={form.avatar} />
 
               <div className="reference-identity">
                 <strong>{form.name || "Без имени"}</strong>
-                <span>{form.amigoId || "ID появится после первого сохранения"}</span>
+                <span>{form.amigoId || "AmiGo ID появится после первого сохранения"}</span>
               </div>
             </div>
 
-            <div className="reference-profile-right">
+            <div className="reference-profile-right profile-mobile-right">
               <div className="screen-heading-row screen-heading-row-compact">
                 <div className="stack-xs">
                   <h1 className="reference-sheet-heading">Профиль</h1>
-                  <p className="reference-sheet-copy">Титул, данные профиля и интересы собраны в одном месте.</p>
                 </div>
               </div>
 
-              <TitleBadge title={form.activeTitle} />
+              <div className="profile-main-title">
+                <TitleBadge title={form.activeTitle} />
+              </div>
 
-              <div className="title-switcher">
+              <div className="title-switcher profile-title-switcher">
                 {form.titles.map((title) => (
                   <button
                     key={title.id}
@@ -240,9 +241,9 @@ export default function ProfilePage() {
                 <label htmlFor="age">Возраст</label>
                 <input
                   id="age"
-                  max={99}
-                  min={16}
-                  onChange={(event) => updateForm({ age: Number(event.target.value) || form.age })}
+                  max={120}
+                  min={0}
+                  onChange={(event) => updateForm({ age: Number(event.target.value) || 0 })}
                   type="number"
                   value={form.age}
                 />
@@ -295,9 +296,7 @@ export default function ProfilePage() {
                   : `Нужно описание от ${MIN_BIO_LENGTH} символов и минимум ${MIN_INTERESTS} интересов.`}
               </p>
               <div className="reference-inline-pills">
-                <span className="reference-meta-pill">
-                  {savedAt ? `Сохранено в ${savedAt}` : "Ещё не сохранено"}
-                </span>
+                <span className="reference-meta-pill">{savedAt ? `Сохранено в ${savedAt}` : "Ещё не сохранено"}</span>
               </div>
             </div>
 

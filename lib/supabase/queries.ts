@@ -404,6 +404,20 @@ export async function sendVideoMessage(
   await sendMediaMessage(supabase, friendshipId, senderId, file, "video");
 }
 
+export async function deleteOwnMessage(
+  supabase: SupabaseClient,
+  messageId: string
+) {
+  const { error } = await supabase
+    .from("messages")
+    .delete()
+    .eq("id", messageId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export function appendIncomingMessage(
   current: ChatMessage[],
   row: MessageRow,

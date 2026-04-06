@@ -15,7 +15,7 @@ create table if not exists public.profiles (
   state_id text not null unique,
   amigo_id text not null unique,
   name text not null,
-  age integer not null check (age between 16 and 99),
+  age integer not null check (age between 0 and 120),
   bio text not null default '',
   avatar_url text not null default '',
   interests text[] not null default '{}',
@@ -542,6 +542,8 @@ update public.messages set message_type = 'text' where message_type is null;
 alter table public.messages alter column message_type set not null;
 alter table public.messages drop constraint if exists messages_message_type_check;
 alter table public.messages add constraint messages_message_type_check check (message_type in ('text', 'image', 'video', 'sticker'));
+alter table public.profiles drop constraint if exists profiles_age_check;
+alter table public.profiles add constraint profiles_age_check check (age between 0 and 120);
 
 create index if not exists messages_friendship_created_at_idx
   on public.messages (friendship_id, created_at);
@@ -1167,6 +1169,21 @@ on public.messages
 for insert
 to authenticated
 with check (
+  auth.uid() = sender_id
+  and exists (
+    select 1
+    from public.friendships
+    where friendships.id = messages.friendship_id
+      and (auth.uid() = friendships.user_one or auth.uid() = friendships.user_two)
+  )
+);
+
+drop policy if exists "messages_delete_own" on public.messages;
+create policy "messages_delete_own"
+on public.messages
+for delete
+to authenticated
+using (
   auth.uid() = sender_id
   and exists (
     select 1
