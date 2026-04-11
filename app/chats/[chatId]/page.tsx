@@ -1724,14 +1724,14 @@ export default function ChatPage() {
       {message ? <div className="toast-panel tg-chat-toast">{message}</div> : null}
       <audio autoPlay hidden ref={remoteAudioRef} />
 
-      {callPhase === "incoming" && incomingCall ? (
+      {false && callPhase === "incoming" && incomingCall ? (
         <div className="tg-call-overlay" role="dialog">
           <div className="tg-call-card">
             <div className="tg-call-card-avatar">
-              <UserAvatar name={friend.profile.name} size="lg" src={friend.profile.avatar} />
+              <UserAvatar name={friend!.profile.name} size="lg" src={friend!.profile.avatar} />
             </div>
             <div className="tg-call-card-copy">
-              <strong>{friend.profile.name}</strong>
+              <strong>{friend!.profile.name}</strong>
               <span>Входящий аудиозвонок</span>
             </div>
             <div className="tg-call-card-actions">
@@ -1746,12 +1746,12 @@ export default function ChatPage() {
         </div>
       ) : null}
 
-      {callPhase !== "idle" && callPhase !== "incoming" ? (
+      {false && callPhase !== "idle" && callPhase !== "incoming" ? (
         <div className="tg-call-strip">
           <div className="tg-call-strip-main">
-            <UserAvatar className="tg-call-strip-avatar" name={friend.profile.name} size="sm" src={friend.profile.avatar} />
+            <UserAvatar className="tg-call-strip-avatar" name={friend!.profile.name} size="sm" src={friend!.profile.avatar} />
             <div className="tg-call-strip-copy">
-              <strong>{friend.profile.name}</strong>
+              <strong>{friend!.profile.name}</strong>
               <span>{callStatusLabel}</span>
             </div>
           </div>
@@ -1762,6 +1762,61 @@ export default function ChatPage() {
             <button className="tg-call-strip-button tg-call-strip-button-danger" onClick={() => void endAudioCall()} type="button">
               Завершить
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {callPhase !== "idle" ? (
+        <div className="tg-call-overlay" role="dialog">
+          <div className="tg-call-screen">
+            <div className="tg-call-screen-top">
+              <span className="tg-call-screen-badge">AmiGo Call</span>
+            </div>
+
+            <div className="tg-call-screen-main">
+              <div className="tg-call-screen-avatar-shell">
+                <div className={`tg-call-screen-ring ${callPhase === "active" ? "tg-call-screen-ring-active" : ""}`} />
+                <div className="tg-call-screen-avatar">
+                  <UserAvatar name={friend.profile.name} size="lg" src={friend.profile.avatar} />
+                </div>
+              </div>
+
+              <div className="tg-call-screen-copy">
+                <strong>{friend.profile.name}</strong>
+                <span>{callPhase === "incoming" && incomingCall ? "Входящий аудиозвонок" : callStatusLabel}</span>
+              </div>
+
+              <div className="tg-call-screen-meta">
+                <span>{friend.profile.activeTitle?.text ?? "Собеседник"}</span>
+                <span>{getPresenceLabel(friend, false)}</span>
+              </div>
+            </div>
+
+            <div className="tg-call-screen-actions">
+              {callPhase === "incoming" && incomingCall ? (
+                <>
+                  <button className="tg-call-screen-action tg-call-screen-action-danger" onClick={() => void declineIncomingCall()} type="button">
+                    Отклонить
+                  </button>
+                  <button className="tg-call-screen-action tg-call-screen-action-primary" onClick={() => void acceptIncomingCall()} type="button">
+                    Ответить
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className={`tg-call-screen-action tg-call-screen-action-muted ${callMuted ? "tg-call-screen-action-muted-active" : ""}`}
+                    onClick={() => toggleCallMute()}
+                    type="button"
+                  >
+                    {callMuted ? "Микрофон выкл." : "Микрофон"}
+                  </button>
+                  <button className="tg-call-screen-action tg-call-screen-action-danger" onClick={() => void endAudioCall()} type="button">
+                    {callPhase === "active" ? "Завершить" : "Отменить"}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       ) : null}
