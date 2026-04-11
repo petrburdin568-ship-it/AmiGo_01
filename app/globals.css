@@ -2251,6 +2251,30 @@ body[data-theme="dark"] .tg-chat-shell {
   gap: 10px;
 }
 
+.tg-chatbar-call {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, #3cb371 52%, var(--stroke));
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(66, 175, 112, 0.2), rgba(36, 102, 66, 0.1));
+  color: #1f6f46;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tg-chatbar-call:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.tg-chatbar-call-active {
+  border-color: rgba(220, 72, 72, 0.38);
+  background: linear-gradient(180deg, rgba(220, 72, 72, 0.18), rgba(113, 24, 24, 0.08));
+  color: #a33434;
+}
+
 .tg-chatbar-status {
   display: inline-flex;
   align-items: center;
@@ -2283,6 +2307,150 @@ body[data-theme="dark"] .tg-chat-shell {
   overflow: auto;
   overscroll-behavior: contain;
   padding: 18px 18px 12px;
+}
+
+.tg-call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 36;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(8, 17, 28, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.tg-call-card {
+  width: min(100%, 360px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 22px;
+  border: 1px solid color-mix(in srgb, var(--stroke) 62%, transparent);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top, rgba(75, 181, 128, 0.16), transparent 54%),
+    color-mix(in srgb, var(--bg-elevated) 96%, transparent);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.24);
+}
+
+.tg-call-card-avatar {
+  display: flex;
+  justify-content: center;
+}
+
+.tg-call-card-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.tg-call-card-copy span {
+  color: var(--muted);
+}
+
+.tg-call-card-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tg-call-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.tg-call-action-primary {
+  background: linear-gradient(180deg, #63d58d 0%, #33b166 100%);
+  color: #07341c;
+}
+
+.tg-call-action-muted {
+  border: 1px solid color-mix(in srgb, #d75a5a 44%, var(--stroke));
+  background: rgba(215, 90, 90, 0.1);
+  color: #b33d3d;
+}
+
+.tg-call-strip {
+  position: fixed;
+  top: calc(84px + env(safe-area-inset-top));
+  right: 18px;
+  z-index: 26;
+  width: min(360px, calc(100vw - 36px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, #4ab474 28%, var(--stroke));
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(72, 191, 120, 0.18), transparent 42%),
+    color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.tg-call-strip-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tg-call-strip-avatar {
+  flex-shrink: 0;
+}
+
+.tg-call-strip-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tg-call-strip-copy span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.tg-call-strip-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.tg-call-strip-button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--stroke) 68%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-muted) 88%, transparent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tg-call-strip-button-active {
+  border-color: color-mix(in srgb, var(--metal) 50%, var(--stroke));
+  color: var(--metal);
+}
+
+.tg-call-strip-button-danger {
+  border-color: rgba(214, 68, 68, 0.38);
+  background: rgba(214, 68, 68, 0.12);
+  color: #b13535;
 }
 
 .tg-service-badge {
@@ -3063,6 +3231,12 @@ body[data-theme="dark"] .tg-chat-shell {
     gap: 8px;
   }
 
+  .tg-chatbar-call {
+    padding: 0 12px;
+    min-height: 34px;
+    font-size: 0.82rem;
+  }
+
   .tg-chatbar-status {
     display: none;
   }
@@ -3085,6 +3259,12 @@ body[data-theme="dark"] .tg-chat-shell {
   .tg-chat-compose {
     grid-template-columns: auto auto minmax(0, 1fr) auto;
     padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .tg-call-strip {
+    top: calc(74px + env(safe-area-inset-top));
+    right: 12px;
+    width: calc(100vw - 24px);
   }
 
   .tg-video-note {
@@ -3158,6 +3338,23 @@ body[data-theme="dark"] .tg-chat-shell {
   .tg-media-panel {
     left: 10px;
     right: 10px;
+  }
+
+  .tg-call-overlay {
+    padding: 12px;
+  }
+
+  .tg-call-card {
+    padding: 24px 18px;
+    border-radius: 24px;
+  }
+
+  .tg-call-card-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .tg-call-strip-actions {
+    flex-direction: column;
   }
 }
 

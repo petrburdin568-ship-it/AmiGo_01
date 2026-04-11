@@ -49,6 +49,23 @@ import type {
 
 type MediaPreviewState = { url: string; type: "image" | "video" } | null;
 type RecordingKind = "voice" | "video-note" | null;
+type CallPhase = "idle" | "incoming" | "outgoing" | "connecting" | "active";
+type CallRejectReason = "declined" | "busy";
+
+type IncomingCallState = {
+  sessionId: string;
+  fromUserId: string;
+};
+
+type CallSignalPayload = {
+  type: "invite" | "accept" | "reject" | "offer" | "answer" | "ice" | "end";
+  sessionId: string;
+  fromUserId: string;
+  toUserId: string;
+  sdp?: RTCSessionDescriptionInit | null;
+  candidate?: RTCIceCandidateInit | null;
+  reason?: CallRejectReason;
+};
 
 type ContextMenuState = {
   messageId: string;
@@ -77,6 +94,12 @@ const MAX_VIDEO_NOTE_SECONDS = 60;
 const VOICE_RECORDING_AUDIO_BITRATE = 64_000;
 const VIDEO_NOTE_RECORDING_VIDEO_BITRATE = 900_000;
 const VIDEO_NOTE_RECORDING_AUDIO_BITRATE = 96_000;
+const CALL_SIGNAL_EVENT = "signal";
+const CALL_ICE_SERVERS: RTCIceServer[] = [
+  {
+    urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
+  }
+];
 
 function formatMessageTime(value: string) {
   const date = new Date(value);
@@ -200,6 +223,20 @@ export default function ChatPage() {
   const discardRecordingRef = useRef(false);
   const restartVideoNoteRef = useRef(false);
   const videoNoteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const callChannelRef = useRef<RealtimeChannel | null>(null);
+  const callChannelReadyRef = useRef(false);
+  const callChannelReadyResolveRef = useRef<(() => void) | null>(null);
+  const callChannelReadyPromiseRef = useRef<Promise<void> | null>(null);
+  const callPeerRef = useRef<RTCPeerConnection | null>(null);
+  const callPhaseRef = useRef<CallPhase>("idle");
+  const callSessionIdRef = useRef("");
+  const callInitiatorRef = useRef(false);
+  const incomingCallRef = useRef<IncomingCallState | null>(null);
+  const handleCallSignalRef = useRef<(payload: CallSignalPayload) => Promise<void>>(async () => undefined);
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const localCallStreamRef = useRef<MediaStream | null>(null);
+  const remoteCallStreamRef = useRef<MediaStream | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const cameraFacingRef = useRef<"user" | "environment">("user");
 
   const [friend, setFriend] = useState<FriendRecord | null>(null);
@@ -220,6 +257,12 @@ export default function ChatPage() {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [cameraPreviewStream, setCameraPreviewStream] = useState<MediaStream | null>(null);
   const [cameraFacingMode, setCameraFacingMode] = useState<"user" | "environment">("user");
+  const [callPhase, setCallPhase] = useState<CallPhase>("idle");
+  const [callSessionId, setCallSessionId] = useState("");
+  const [incomingCall, setIncomingCall] = useState<IncomingCallState | null>(null);
+  const [callMuted, setCallMuted] = useState(false);
+  const [callDurationSeconds, setCallDurationSeconds] = useState(0);
+  const [remoteCallStream, setRemoteCallStream] = useState<MediaStream | null>(null);
   const [arenaInvite, setArenaInvite] = useState<ArenaInvite | null>(null);
   const [arenaMatch, setArenaMatch] = useState<ArenaMatch | null>(null);
   const [arenaMenuOpen, setArenaMenuOpen] = useState(false);
@@ -261,6 +304,18 @@ export default function ChatPage() {
   }, [cameraFacingMode]);
 
   useEffect(() => {
+    callPhaseRef.current = callPhase;
+  }, [callPhase]);
+
+  useEffect(() => {
+    callSessionIdRef.current = callSessionId;
+  }, [callSessionId]);
+
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
+
+  useEffect(() => {
     if (!recordingKind) {
       setRecordingSeconds(0);
       return;
@@ -274,6 +329,31 @@ export default function ChatPage() {
 
     return () => clearInterval(interval);
   }, [recordingKind]);
+
+  useEffect(() => {
+    if (callPhase !== "active") {
+      setCallDurationSeconds(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCallDurationSeconds((current) => current + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [callPhase]);
+
+  useEffect(() => {
+    if (!remoteAudioRef.current) {
+      return;
+    }
+
+    remoteAudioRef.current.srcObject = remoteCallStream;
+
+    if (remoteCallStream) {
+      void remoteAudioRef.current.play().catch(() => undefined);
+    }
+  }, [remoteCallStream]);
 
   useEffect(() => {
     if (!session || !chatId) {
@@ -494,6 +574,50 @@ export default function ChatPage() {
       }
 
       typingChannelRef.current = null;
+      void supabase.removeChannel(channel);
+    };
+  }, [chatId, session, supabase]);
+
+  useEffect(() => {
+    if (!session || !chatId) {
+      callChannelRef.current = null;
+      callChannelReadyRef.current = false;
+      return;
+    }
+
+    callChannelReadyRef.current = false;
+    callChannelReadyPromiseRef.current = new Promise<void>((resolve) => {
+      callChannelReadyResolveRef.current = resolve;
+    });
+
+    const channel = supabase.channel(`call:${chatId}`, {
+      config: {
+        broadcast: {
+          self: false
+        }
+      }
+    });
+
+    callChannelRef.current = channel;
+
+    channel
+      .on("broadcast", { event: CALL_SIGNAL_EVENT }, ({ payload }) => {
+        void handleCallSignalRef.current(payload as CallSignalPayload);
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          callChannelReadyRef.current = true;
+          callChannelReadyResolveRef.current?.();
+          callChannelReadyResolveRef.current = null;
+        }
+      });
+
+    return () => {
+      callChannelReadyRef.current = false;
+      callChannelReadyResolveRef.current = null;
+      callChannelReadyPromiseRef.current = null;
+      callChannelRef.current = null;
+      cleanupCallResources();
       void supabase.removeChannel(channel);
     };
   }, [chatId, session, supabase]);
@@ -846,6 +970,446 @@ export default function ChatPage() {
     }
   }
 
+  function cleanupCallResources() {
+    pendingIceCandidatesRef.current = [];
+
+    const peer = callPeerRef.current;
+    if (peer) {
+      peer.onicecandidate = null;
+      peer.ontrack = null;
+      peer.onconnectionstatechange = null;
+      peer.close();
+    }
+
+    callPeerRef.current = null;
+    callInitiatorRef.current = false;
+    callPhaseRef.current = "idle";
+    callSessionIdRef.current = "";
+    incomingCallRef.current = null;
+
+    localCallStreamRef.current?.getTracks().forEach((track) => track.stop());
+    localCallStreamRef.current = null;
+
+    remoteCallStreamRef.current?.getTracks().forEach((track) => track.stop());
+    remoteCallStreamRef.current = null;
+
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+    }
+
+    setRemoteCallStream(null);
+    setIncomingCall(null);
+    setCallMuted(false);
+    setCallDurationSeconds(0);
+    setCallSessionId("");
+    setCallPhase("idle");
+  }
+
+  async function waitForCallChannelReady() {
+    if (callChannelReadyRef.current) {
+      return;
+    }
+
+    await callChannelReadyPromiseRef.current;
+  }
+
+  async function sendCallSignal(payload: CallSignalPayload) {
+    await waitForCallChannelReady();
+
+    const channel = callChannelRef.current;
+    if (!channel) {
+      throw new Error("Канал звонков недоступен.");
+    }
+
+    const status = await channel.send({
+      type: "broadcast",
+      event: CALL_SIGNAL_EVENT,
+      payload
+    });
+
+    if (status !== "ok") {
+      throw new Error("Не удалось отправить сигнал звонка.");
+    }
+  }
+
+  function callFeatureAvailable() {
+    return (
+      typeof window !== "undefined" &&
+      typeof RTCPeerConnection !== "undefined" &&
+      Boolean(navigator.mediaDevices?.getUserMedia)
+    );
+  }
+
+  async function ensureLocalCallStream() {
+    if (localCallStreamRef.current) {
+      return localCallStreamRef.current;
+    }
+
+    if (!callFeatureAvailable()) {
+      throw new Error("Звонки не поддерживаются на этом устройстве.");
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+
+    localCallStreamRef.current = stream;
+    setCallMuted(false);
+    return stream;
+  }
+
+  async function flushPendingIceCandidates(peer: RTCPeerConnection) {
+    if (!pendingIceCandidatesRef.current.length) {
+      return;
+    }
+
+    const candidates = [...pendingIceCandidatesRef.current];
+    pendingIceCandidatesRef.current = [];
+
+    for (const candidate of candidates) {
+      await peer.addIceCandidate(candidate);
+    }
+  }
+
+  async function ensureCallPeer(sessionId: string) {
+    const userId = session?.user.id;
+    const targetUserId = friend?.profile.id;
+
+    if (!userId || !targetUserId) {
+      throw new Error("Не удалось определить участников звонка.");
+    }
+
+    if (callPeerRef.current) {
+      return callPeerRef.current;
+    }
+
+    const localStream = await ensureLocalCallStream();
+    const remoteStream = new MediaStream();
+    remoteCallStreamRef.current = remoteStream;
+    setRemoteCallStream(remoteStream);
+
+    const peer = new RTCPeerConnection({
+      iceServers: CALL_ICE_SERVERS
+    });
+
+    localStream.getTracks().forEach((track) => {
+      peer.addTrack(track, localStream);
+    });
+
+    peer.onicecandidate = ({ candidate }) => {
+      if (!candidate) {
+        return;
+      }
+
+      void sendCallSignal({
+        type: "ice",
+        sessionId,
+        fromUserId: userId,
+        toUserId: targetUserId,
+        candidate: candidate.toJSON()
+      }).catch(() => undefined);
+    };
+
+    peer.ontrack = (event) => {
+      const nextRemoteStream = remoteCallStreamRef.current ?? new MediaStream();
+
+      if (!remoteCallStreamRef.current) {
+        remoteCallStreamRef.current = nextRemoteStream;
+        setRemoteCallStream(nextRemoteStream);
+      }
+
+      const tracks = event.streams[0]?.getTracks().length ? event.streams[0].getTracks() : [event.track];
+      tracks.forEach((track) => {
+        if (!nextRemoteStream.getTracks().some((existingTrack) => existingTrack.id === track.id)) {
+          nextRemoteStream.addTrack(track);
+        }
+      });
+    };
+
+    peer.onconnectionstatechange = () => {
+      if (peer.connectionState === "connected") {
+        setCallPhase("active");
+        return;
+      }
+
+      if (peer.connectionState === "failed" || peer.connectionState === "disconnected" || peer.connectionState === "closed") {
+        cleanupCallResources();
+        setMessage("Звонок завершён.");
+      }
+    };
+
+    callPeerRef.current = peer;
+    return peer;
+  }
+
+  async function startOutgoingOffer(sessionId: string) {
+    const userId = session?.user.id;
+    const targetUserId = friend?.profile.id;
+
+    if (!userId || !targetUserId) {
+      throw new Error("Не удалось определить участников звонка.");
+    }
+
+    const peer = await ensureCallPeer(sessionId);
+    const offer = await peer.createOffer({
+      offerToReceiveAudio: true
+    });
+
+    await peer.setLocalDescription(offer);
+
+    await sendCallSignal({
+      type: "offer",
+      sessionId,
+      fromUserId: userId,
+      toUserId: targetUserId,
+      sdp: offer
+    });
+  }
+
+  async function finishCall(notifyRemote = true, nextMessage?: string) {
+    const userId = session?.user.id;
+    const targetUserId = friend?.profile.id;
+    const activeSessionId = callSessionIdRef.current || incomingCallRef.current?.sessionId || "";
+
+    if (notifyRemote && userId && targetUserId && activeSessionId) {
+      try {
+        await sendCallSignal({
+          type: "end",
+          sessionId: activeSessionId,
+          fromUserId: userId,
+          toUserId: targetUserId
+        });
+      } catch {
+        // best effort
+      }
+    }
+
+    cleanupCallResources();
+
+    if (nextMessage) {
+      setMessage(nextMessage);
+    }
+  }
+
+  async function rejectIncomingCall(reason: CallRejectReason) {
+    const userId = session?.user.id;
+    const targetUserId = friend?.profile.id;
+    const currentIncomingCall = incomingCallRef.current;
+
+    if (userId && targetUserId && currentIncomingCall) {
+      await sendCallSignal({
+        type: "reject",
+        sessionId: currentIncomingCall.sessionId,
+        fromUserId: userId,
+        toUserId: targetUserId,
+        reason
+      });
+    }
+
+    cleanupCallResources();
+  }
+
+  async function handleCallSignal(payload: CallSignalPayload) {
+    const userId = session?.user.id;
+
+    if (!userId || payload.toUserId !== userId) {
+      return;
+    }
+
+    if (payload.type === "invite") {
+      if (callPhaseRef.current !== "idle" || Boolean(incomingCallRef.current)) {
+        await sendCallSignal({
+          type: "reject",
+          sessionId: payload.sessionId,
+          fromUserId: userId,
+          toUserId: payload.fromUserId,
+          reason: "busy"
+        });
+        return;
+      }
+
+      setIncomingCall({
+        sessionId: payload.sessionId,
+        fromUserId: payload.fromUserId
+      });
+      incomingCallRef.current = {
+        sessionId: payload.sessionId,
+        fromUserId: payload.fromUserId
+      };
+      callSessionIdRef.current = payload.sessionId;
+      callPhaseRef.current = "incoming";
+      setCallSessionId(payload.sessionId);
+      setCallPhase("incoming");
+      return;
+    }
+
+    if (payload.type === "accept") {
+      if (payload.sessionId !== callSessionIdRef.current || !callInitiatorRef.current) {
+        return;
+      }
+
+      setCallPhase("connecting");
+      callPhaseRef.current = "connecting";
+      await startOutgoingOffer(payload.sessionId);
+      return;
+    }
+
+    if (payload.type === "reject") {
+      if (payload.sessionId !== callSessionIdRef.current) {
+        return;
+      }
+
+      cleanupCallResources();
+      setMessage(payload.reason === "busy" ? "Собеседник сейчас занят." : "Собеседник отклонил звонок.");
+      return;
+    }
+
+    if (payload.type === "offer") {
+      if (payload.sessionId !== callSessionIdRef.current || !payload.sdp) {
+        return;
+      }
+
+      const peer = await ensureCallPeer(payload.sessionId);
+      await peer.setRemoteDescription(payload.sdp);
+      await flushPendingIceCandidates(peer);
+
+      const answer = await peer.createAnswer();
+      await peer.setLocalDescription(answer);
+
+      await sendCallSignal({
+        type: "answer",
+        sessionId: payload.sessionId,
+        fromUserId: userId,
+        toUserId: payload.fromUserId,
+        sdp: answer
+      });
+
+      return;
+    }
+
+    if (payload.type === "answer") {
+      if (payload.sessionId !== callSessionIdRef.current || !payload.sdp || !callPeerRef.current) {
+        return;
+      }
+
+      await callPeerRef.current.setRemoteDescription(payload.sdp);
+      await flushPendingIceCandidates(callPeerRef.current);
+      return;
+    }
+
+    if (payload.type === "ice") {
+      if (payload.sessionId !== callSessionIdRef.current || !payload.candidate) {
+        return;
+      }
+
+      const peer = callPeerRef.current;
+      if (!peer || !peer.remoteDescription) {
+        pendingIceCandidatesRef.current.push(payload.candidate);
+        return;
+      }
+
+      await peer.addIceCandidate(payload.candidate);
+      return;
+    }
+
+    if (payload.type === "end") {
+      if (payload.sessionId !== callSessionIdRef.current && payload.sessionId !== incomingCallRef.current?.sessionId) {
+        return;
+      }
+
+      cleanupCallResources();
+      setMessage("Собеседник завершил звонок.");
+    }
+  }
+
+  handleCallSignalRef.current = handleCallSignal;
+
+  async function startAudioCall() {
+    if (!session || !friend) {
+      return;
+    }
+
+    if (callPhaseRef.current !== "idle") {
+      setMessage("Сначала завершите текущий звонок.");
+      return;
+    }
+
+    try {
+      const nextSessionId = crypto.randomUUID();
+      callInitiatorRef.current = true;
+      callSessionIdRef.current = nextSessionId;
+      callPhaseRef.current = "outgoing";
+      setCallSessionId(nextSessionId);
+      setCallPhase("outgoing");
+      await ensureLocalCallStream();
+      await sendCallSignal({
+        type: "invite",
+        sessionId: nextSessionId,
+        fromUserId: session.user.id,
+        toUserId: friend.profile.id
+      });
+      setMessage("");
+    } catch (error) {
+      callInitiatorRef.current = false;
+      cleanupCallResources();
+      setMessage(error instanceof Error ? error.message : "Не удалось начать звонок.");
+    }
+  }
+
+  async function acceptIncomingCall() {
+    if (!session || !friend || !incomingCallRef.current) {
+      return;
+    }
+
+    const nextSessionId = incomingCallRef.current.sessionId;
+
+    try {
+      callInitiatorRef.current = false;
+      callSessionIdRef.current = nextSessionId;
+      callPhaseRef.current = "connecting";
+      incomingCallRef.current = null;
+      setIncomingCall(null);
+      setCallSessionId(nextSessionId);
+      setCallPhase("connecting");
+      await ensureCallPeer(nextSessionId);
+      await sendCallSignal({
+        type: "accept",
+        sessionId: nextSessionId,
+        fromUserId: session.user.id,
+        toUserId: friend.profile.id
+      });
+      setMessage("");
+    } catch (error) {
+      cleanupCallResources();
+      setMessage(error instanceof Error ? error.message : "Не удалось принять звонок.");
+    }
+  }
+
+  async function declineIncomingCall() {
+    try {
+      await rejectIncomingCall("declined");
+    } catch (error) {
+      cleanupCallResources();
+      setMessage(error instanceof Error ? error.message : "Не удалось отклонить звонок.");
+    }
+  }
+
+  async function endAudioCall() {
+    await finishCall(true);
+  }
+
+  function toggleCallMute() {
+    const nextMuted = !callMuted;
+    localCallStreamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = !nextMuted;
+    });
+    setCallMuted(nextMuted);
+  }
+
   async function finishRecording(kind: "voice" | "video-note", blob: Blob) {
     if (!session) {
       return;
@@ -1105,6 +1669,16 @@ export default function ChatPage() {
   const isArenaSender = arenaInvite?.senderId === session?.user.id;
   const isArenaRecipient = arenaInvite?.recipientId === session?.user.id;
   const hasArenaMatch = Boolean(arenaInvite?.arenaMatchId);
+  const callStatusLabel =
+    callPhase === "outgoing"
+      ? "Звоним..."
+      : callPhase === "incoming"
+        ? "Входящий звонок"
+        : callPhase === "connecting"
+          ? "Соединяем..."
+          : callPhase === "active"
+            ? `Идёт звонок ${formatRecordingTime(callDurationSeconds)}`
+            : "";
 
   if (!session && !loading) {
     return (
@@ -1148,6 +1722,49 @@ export default function ChatPage() {
   return (
     <AppShell mode="chat" title="" description="">
       {message ? <div className="toast-panel tg-chat-toast">{message}</div> : null}
+      <audio autoPlay hidden ref={remoteAudioRef} />
+
+      {callPhase === "incoming" && incomingCall ? (
+        <div className="tg-call-overlay" role="dialog">
+          <div className="tg-call-card">
+            <div className="tg-call-card-avatar">
+              <UserAvatar name={friend.profile.name} size="lg" src={friend.profile.avatar} />
+            </div>
+            <div className="tg-call-card-copy">
+              <strong>{friend.profile.name}</strong>
+              <span>Входящий аудиозвонок</span>
+            </div>
+            <div className="tg-call-card-actions">
+              <button className="tg-call-action tg-call-action-muted" onClick={() => void declineIncomingCall()} type="button">
+                Отклонить
+              </button>
+              <button className="tg-call-action tg-call-action-primary" onClick={() => void acceptIncomingCall()} type="button">
+                Ответить
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {callPhase !== "idle" && callPhase !== "incoming" ? (
+        <div className="tg-call-strip">
+          <div className="tg-call-strip-main">
+            <UserAvatar className="tg-call-strip-avatar" name={friend.profile.name} size="sm" src={friend.profile.avatar} />
+            <div className="tg-call-strip-copy">
+              <strong>{friend.profile.name}</strong>
+              <span>{callStatusLabel}</span>
+            </div>
+          </div>
+          <div className="tg-call-strip-actions">
+            <button className={`tg-call-strip-button ${callMuted ? "tg-call-strip-button-active" : ""}`} onClick={() => toggleCallMute()} type="button">
+              {callMuted ? "Микрофон выкл." : "Микрофон"}
+            </button>
+            <button className="tg-call-strip-button tg-call-strip-button-danger" onClick={() => void endAudioCall()} type="button">
+              Завершить
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {preview ? (
         <div className="tg-media-viewer" onClick={() => setPreview(null)} role="dialog">
@@ -1296,6 +1913,15 @@ export default function ChatPage() {
             </div>
 
             <div className="tg-chatbar-actions">
+              <button
+                aria-label="Позвонить"
+                className={`tg-chatbar-call ${callPhase !== "idle" ? "tg-chatbar-call-active" : ""}`}
+                disabled={callPhase !== "idle" || !callFeatureAvailable()}
+                onClick={() => void startAudioCall()}
+                type="button"
+              >
+                Звонок
+              </button>
               <span className="tg-chatbar-status">{getPresenceLabel(friend, otherTyping)}</span>
               <Link className="tg-chatbar-profile" href={`/friends/${friend.friendshipId}`}>
                 Профиль
