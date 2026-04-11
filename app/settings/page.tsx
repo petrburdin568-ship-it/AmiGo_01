@@ -7,12 +7,17 @@ import { useLanguage } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import {
   BUILT_IN_CALL_RINGTONES,
+  getStoredCallRingtoneVolume,
+  getStoredCallVibrationEnabled,
   deleteCustomCallRingtone,
   getStoredCallRingtoneChoice,
   getStoredCustomCallRingtoneName,
   hasCustomCallRingtone,
+  resolveCallRingtoneSource,
   saveCustomCallRingtone,
   setStoredCallRingtoneChoice,
+  setStoredCallRingtoneVolume,
+  setStoredCallVibrationEnabled,
   type CallRingtoneChoice
 } from "@/lib/call-ringtone";
 
@@ -20,11 +25,16 @@ export default function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
   const customRingtoneInputRef = useRef<HTMLInputElement | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const previewCleanupRef = useRef<(() => void) | null>(null);
   const [ringtoneChoice, setRingtoneChoice] = useState<CallRingtoneChoice>(() => getStoredCallRingtoneChoice());
   const [hasCustomRingtoneOption, setHasCustomRingtoneOption] = useState(false);
   const [customRingtoneName, setCustomRingtoneName] = useState("");
   const [ringtoneMessage, setRingtoneMessage] = useState("");
   const [ringtoneBusy, setRingtoneBusy] = useState(false);
+  const [ringtoneVolume, setRingtoneVolume] = useState(() => getStoredCallRingtoneVolume());
+  const [callVibrationEnabled, setCallVibrationEnabledState] = useState(() => getStoredCallVibrationEnabled());
+  const [previewingId, setPreviewingId] = useState<"custom" | (typeof BUILT_IN_CALL_RINGTONES)[number]["id"] | "">("");
 
   const copy =
     language === "ru"
@@ -46,9 +56,18 @@ export default function SettingsPage() {
           ringtoneDeleteCustom: "Удалить свой",
           ringtoneCustomMissing: "Свой рингтон ещё не загружен.",
           ringtoneUploadHint: "Поддерживаются аудиофайлы: mp3, wav, ogg, m4a.",
+          ringtoneSelect: "Выбрать",
           ringtoneSaved: "Мелодия звонка обновлена.",
           ringtoneDeleted: "Пользовательский рингтон удалён.",
           ringtoneInvalid: "Нужен аудиофайл.",
+          ringtonePreview: "Слушать",
+          ringtoneStopPreview: "Стоп",
+          ringtoneVolumeLabel: "Громкость звонка",
+          ringtoneVolumeText: "Регулирует громкость входящей мелодии.",
+          vibrationLabel: "Вибрация при входящем звонке",
+          vibrationText: "Если устройство поддерживает вибрацию, звонок будет дополнительно вибрировать.",
+          vibrationOn: "Включена",
+          vibrationOff: "Выключена",
           russian: "Русский",
           english: "English"
         }
@@ -70,9 +89,18 @@ export default function SettingsPage() {
           ringtoneDeleteCustom: "Delete custom",
           ringtoneCustomMissing: "No custom ringtone uploaded yet.",
           ringtoneUploadHint: "Supported audio files: mp3, wav, ogg, m4a.",
+          ringtoneSelect: "Select",
           ringtoneSaved: "Call ringtone updated.",
           ringtoneDeleted: "Custom ringtone deleted.",
           ringtoneInvalid: "Please choose an audio file.",
+          ringtonePreview: "Preview",
+          ringtoneStopPreview: "Stop",
+          ringtoneVolumeLabel: "Ringtone volume",
+          ringtoneVolumeText: "Controls the incoming ringtone loudness.",
+          vibrationLabel: "Incoming call vibration",
+          vibrationText: "If the device supports vibration, incoming calls will vibrate too.",
+          vibrationOn: "Enabled",
+          vibrationOff: "Disabled",
           russian: "Russian",
           english: "English"
         };
@@ -90,11 +118,15 @@ export default function SettingsPage() {
         setHasCustomRingtoneOption(customExists);
         setCustomRingtoneName(getStoredCustomCallRingtoneName());
         setRingtoneChoice(getStoredCallRingtoneChoice());
+        setRingtoneVolume(getStoredCallRingtoneVolume());
+        setCallVibrationEnabledState(getStoredCallVibrationEnabled());
       } catch {
         if (active) {
           setHasCustomRingtoneOption(false);
           setCustomRingtoneName("");
           setRingtoneChoice(getStoredCallRingtoneChoice());
+          setRingtoneVolume(getStoredCallRingtoneVolume());
+          setCallVibrationEnabledState(getStoredCallVibrationEnabled());
         }
       }
     }
@@ -105,6 +137,22 @@ export default function SettingsPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      previewAudioRef.current?.pause();
+      previewAudioRef.current = null;
+      const cleanup = previewCleanupRef.current;
+      previewCleanupRef.current = null;
+      cleanup?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.volume = ringtoneVolume;
+    }
+  }, [ringtoneVolume]);
 
   function handleSelectBuiltInRingtone(id: (typeof BUILT_IN_CALL_RINGTONES)[number]["id"]) {
     const nextChoice: CallRingtoneChoice = {
@@ -159,6 +207,55 @@ export default function SettingsPage() {
     setStoredCallRingtoneChoice(nextChoice);
     setRingtoneChoice(nextChoice);
     setRingtoneMessage(copy.ringtoneSaved);
+  }
+
+  function handleRingtoneVolumeChange(nextValue: number) {
+    setStoredCallRingtoneVolume(nextValue);
+    setRingtoneVolume(nextValue);
+    setRingtoneMessage("");
+  }
+
+  function handleVibrationToggle() {
+    const nextValue = !callVibrationEnabled;
+    setStoredCallVibrationEnabled(nextValue);
+    setCallVibrationEnabledState(nextValue);
+    setRingtoneMessage("");
+  }
+
+  async function stopPreview() {
+    previewAudioRef.current?.pause();
+    previewAudioRef.current = null;
+    const cleanup = previewCleanupRef.current;
+    previewCleanupRef.current = null;
+    cleanup?.();
+    setPreviewingId("");
+  }
+
+  async function handlePreviewRingtone(choice: CallRingtoneChoice, previewId: "custom" | (typeof BUILT_IN_CALL_RINGTONES)[number]["id"]) {
+    if (previewingId === previewId) {
+      await stopPreview();
+      return;
+    }
+
+    await stopPreview();
+
+    try {
+      const resolved = await resolveCallRingtoneSource(choice);
+      const audio = new Audio(resolved.src);
+      audio.volume = ringtoneVolume;
+      previewCleanupRef.current = resolved.revoke ?? null;
+      previewAudioRef.current = audio;
+      setPreviewingId(previewId);
+
+      audio.onended = () => {
+        void stopPreview();
+      };
+
+      await audio.play();
+    } catch (error) {
+      setRingtoneMessage(error instanceof Error ? error.message : copy.ringtoneInvalid);
+      await stopPreview();
+    }
   }
 
   async function handleDeleteCustomRingtone() {
@@ -248,18 +345,26 @@ export default function SettingsPage() {
               <div className="settings-ringtone-options">
                 {BUILT_IN_CALL_RINGTONES.map((option) => {
                   const selected = ringtoneChoice.type === "builtin" && ringtoneChoice.id === option.id;
+                  const isPreviewing = previewingId === option.id;
 
                   return (
-                    <button
-                      key={option.id}
-                      className={`settings-ringtone-option ${selected ? "settings-ringtone-option-selected" : ""}`}
-                      onClick={() => handleSelectBuiltInRingtone(option.id)}
-                      type="button"
-                    >
+                    <div key={option.id} className={`settings-ringtone-option ${selected ? "settings-ringtone-option-selected" : ""}`}>
                       <strong>{option.label[language]}</strong>
                       <span>{option.description[language]}</span>
                       {selected ? <em>{copy.ringtoneCurrent}</em> : null}
-                    </button>
+                      <span className="settings-ringtone-option-action">
+                        <button className="button button-primary" onClick={() => handleSelectBuiltInRingtone(option.id)} type="button">
+                          {selected ? copy.ringtoneCurrent : copy.ringtoneSelect}
+                        </button>
+                        <button
+                          className="button button-secondary"
+                          onClick={() => void handlePreviewRingtone({ type: "builtin", id: option.id }, option.id)}
+                          type="button"
+                        >
+                          {isPreviewing ? copy.ringtoneStopPreview : copy.ringtonePreview}
+                        </button>
+                      </span>
+                    </div>
                   );
                 })}
               </div>
@@ -281,6 +386,14 @@ export default function SettingsPage() {
                   </button>
                   {hasCustomRingtoneOption ? (
                     <>
+                      <button
+                        className="button button-secondary"
+                        disabled={ringtoneBusy}
+                        onClick={() => void handlePreviewRingtone({ type: "custom" }, "custom")}
+                        type="button"
+                      >
+                        {previewingId === "custom" ? copy.ringtoneStopPreview : copy.ringtonePreview}
+                      </button>
                       <button className="button button-primary" disabled={ringtoneBusy} onClick={handleUseCustomRingtone} type="button">
                         {copy.ringtoneUseCustom}
                       </button>
@@ -300,6 +413,36 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="reference-action-row settings-row">
+          <div className="stack-xs">
+            <div className="panel-title">{copy.ringtoneVolumeLabel}</div>
+            <p className="reference-sheet-copy">{copy.ringtoneVolumeText}</p>
+          </div>
+
+          <div className="settings-slider-panel">
+            <input
+              className="settings-range"
+              max={100}
+              min={0}
+              onChange={(event) => handleRingtoneVolumeChange(Number(event.target.value) / 100)}
+              type="range"
+              value={Math.round(ringtoneVolume * 100)}
+            />
+            <strong>{Math.round(ringtoneVolume * 100)}%</strong>
+          </div>
+        </div>
+
+        <div className="reference-action-row settings-row">
+          <div className="stack-xs">
+            <div className="panel-title">{copy.vibrationLabel}</div>
+            <p className="reference-sheet-copy">{copy.vibrationText}</p>
+          </div>
+
+          <button className="button button-secondary" onClick={handleVibrationToggle} type="button">
+            {callVibrationEnabled ? copy.vibrationOn : copy.vibrationOff}
+          </button>
         </div>
 
         <AdminConsole />

@@ -30,6 +30,8 @@ type CallRingtoneSourceResult = {
 };
 
 const CALL_RINGTONE_STORAGE_KEY = "amigo-call-ringtone-choice";
+const CALL_RINGTONE_VOLUME_KEY = "amigo-call-ringtone-volume";
+const CALL_VIBRATION_ENABLED_KEY = "amigo-call-vibration-enabled";
 const CUSTOM_CALL_RINGTONE_NAME_KEY = "amigo-custom-call-ringtone-name";
 const CUSTOM_CALL_RINGTONE_DB_NAME = "amigo-call-ringtone-db";
 const CUSTOM_CALL_RINGTONE_STORE_NAME = "ringtones";
@@ -65,6 +67,8 @@ export const BUILT_IN_CALL_RINGTONES: BuiltInCallRingtoneOption[] = [
 ];
 
 export const DEFAULT_CALL_RINGTONE_ID: BuiltInCallRingtoneId = "soft-ping-loop";
+export const DEFAULT_CALL_RINGTONE_VOLUME = 0.75;
+export const DEFAULT_CALL_VIBRATION_ENABLED = true;
 
 function getDefaultCallRingtoneChoice(): CallRingtoneChoice {
   return {
@@ -153,6 +157,53 @@ export function setStoredCallRingtoneChoice(choice: CallRingtoneChoice) {
   }
 
   window.localStorage.setItem(CALL_RINGTONE_STORAGE_KEY, JSON.stringify(choice));
+  dispatchCallRingtoneChanged();
+}
+
+export function getStoredCallRingtoneVolume() {
+  if (typeof window === "undefined") {
+    return DEFAULT_CALL_RINGTONE_VOLUME;
+  }
+
+  const rawValue = window.localStorage.getItem(CALL_RINGTONE_VOLUME_KEY);
+  const parsed = Number(rawValue);
+
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_CALL_RINGTONE_VOLUME;
+  }
+
+  return Math.min(1, Math.max(0, parsed));
+}
+
+export function setStoredCallRingtoneVolume(value: number) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const normalized = Math.min(1, Math.max(0, value));
+  window.localStorage.setItem(CALL_RINGTONE_VOLUME_KEY, String(normalized));
+  dispatchCallRingtoneChanged();
+}
+
+export function getStoredCallVibrationEnabled() {
+  if (typeof window === "undefined") {
+    return DEFAULT_CALL_VIBRATION_ENABLED;
+  }
+
+  const rawValue = window.localStorage.getItem(CALL_VIBRATION_ENABLED_KEY);
+  if (rawValue === null) {
+    return DEFAULT_CALL_VIBRATION_ENABLED;
+  }
+
+  return rawValue === "true";
+}
+
+export function setStoredCallVibrationEnabled(enabled: boolean) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(CALL_VIBRATION_ENABLED_KEY, String(enabled));
   dispatchCallRingtoneChanged();
 }
 

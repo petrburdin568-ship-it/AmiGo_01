@@ -36,7 +36,12 @@ import {
   sendVideoNoteMessage,
   sendVoiceMessage
 } from "@/lib/supabase/queries";
-import { CALL_RINGTONE_CHANGE_EVENT, resolveCallRingtoneSource } from "@/lib/call-ringtone";
+import {
+  CALL_RINGTONE_CHANGE_EVENT,
+  getStoredCallRingtoneVolume,
+  getStoredCallVibrationEnabled,
+  resolveCallRingtoneSource
+} from "@/lib/call-ringtone";
 import { optimizeImageForUpload, optimizeVideoForUpload } from "@/lib/media-optimizer";
 import type { MessageRow } from "@/lib/supabase/types";
 import { getStickerByValue, STICKER_OPTIONS } from "@/lib/stickers";
@@ -267,6 +272,8 @@ export default function ChatPage() {
   const [callDurationSeconds, setCallDurationSeconds] = useState(0);
   const [remoteCallStream, setRemoteCallStream] = useState<MediaStream | null>(null);
   const [ringtoneSrc, setRingtoneSrc] = useState("/sounds/soft-ping-loop.mp3");
+  const [ringtoneVolume, setRingtoneVolume] = useState(() => getStoredCallRingtoneVolume());
+  const [callVibrationEnabled, setCallVibrationEnabled] = useState(() => getStoredCallVibrationEnabled());
   const [arenaInvite, setArenaInvite] = useState<ArenaInvite | null>(null);
   const [arenaMatch, setArenaMatch] = useState<ArenaMatch | null>(null);
   const [arenaMenuOpen, setArenaMenuOpen] = useState(false);
@@ -365,6 +372,37 @@ export default function ChatPage() {
       return;
     }
 
+    ringtone.volume = ringtoneVolume;
+  }, [ringtoneVolume]);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") {
+      return;
+    }
+
+    if (callPhase !== "incoming" || !incomingCall || !callVibrationEnabled) {
+      navigator.vibrate(0);
+      return;
+    }
+
+    const pattern = [300, 180, 300, 900] as const;
+    navigator.vibrate(pattern);
+    const interval = window.setInterval(() => {
+      navigator.vibrate(pattern);
+    }, 1680);
+
+    return () => {
+      window.clearInterval(interval);
+      navigator.vibrate(0);
+    };
+  }, [callPhase, callVibrationEnabled, incomingCall]);
+
+  useEffect(() => {
+    const ringtone = ringtoneAudioRef.current;
+    if (!ringtone) {
+      return;
+    }
+
     if (callPhase === "incoming" && incomingCall) {
       ringtone.currentTime = 0;
       void ringtone.play().catch(() => undefined);
@@ -382,10 +420,13 @@ export default function ChatPage() {
 
     let active = true;
 
-    async function loadRingtoneSource() {
+    async function loadRingtonePreferences() {
       const previousCleanup = ringtoneCleanupRef.current;
       ringtoneCleanupRef.current = null;
       previousCleanup?.();
+
+      setRingtoneVolume(getStoredCallRingtoneVolume());
+      setCallVibrationEnabled(getStoredCallVibrationEnabled());
 
       const resolved = await resolveCallRingtoneSource();
       if (!active) {
@@ -398,10 +439,10 @@ export default function ChatPage() {
     }
 
     const handleRingtoneChanged = () => {
-      void loadRingtoneSource();
+      void loadRingtonePreferences();
     };
 
-    void loadRingtoneSource();
+    void loadRingtonePreferences();
     window.addEventListener(CALL_RINGTONE_CHANGE_EVENT, handleRingtoneChanged);
     window.addEventListener("storage", handleRingtoneChanged);
 

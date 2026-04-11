@@ -4703,6 +4703,13 @@ body[data-theme="dark"] .tg-chat-shell {
   font-weight: 700;
 }
 
+.settings-ringtone-option-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
 .settings-ringtone-option-selected {
   border-color: color-mix(in srgb, var(--metal) 52%, var(--stroke));
   background:
@@ -4736,6 +4743,19 @@ body[data-theme="dark"] .tg-chat-shell {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.settings-slider-panel {
+  display: flex;
+  min-width: min(100%, 320px);
+  flex: 1;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-range {
+  width: 100%;
+  accent-color: color-mix(in srgb, var(--metal) 66%, var(--accent));
 }
 
 .discover-plain-block {
@@ -4774,6 +4794,12 @@ body[data-theme="dark"] .tg-chat-shell {
 
   .settings-ringtone-custom-actions {
     flex-direction: column;
+  }
+
+  .settings-ringtone-option-action,
+  .settings-slider-panel {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .menu-page {
