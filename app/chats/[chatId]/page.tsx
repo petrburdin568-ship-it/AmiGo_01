@@ -36,6 +36,7 @@ import {
   sendVideoNoteMessage,
   sendVoiceMessage
 } from "@/lib/supabase/queries";
+import { optimizeImageForUpload, optimizeVideoForUpload } from "@/lib/media-optimizer";
 import type { MessageRow } from "@/lib/supabase/types";
 import { getStickerByValue, STICKER_OPTIONS } from "@/lib/stickers";
 import type {
@@ -72,6 +73,10 @@ type PresenceMeta = {
 const CONTEXT_MENU_MARGIN = 12;
 const CONTEXT_MENU_FALLBACK_WIDTH = 196;
 const CONTEXT_MENU_FALLBACK_HEIGHT = 208;
+const MAX_VIDEO_NOTE_SECONDS = 60;
+const VOICE_RECORDING_AUDIO_BITRATE = 64_000;
+const VIDEO_NOTE_RECORDING_VIDEO_BITRATE = 900_000;
+const VIDEO_NOTE_RECORDING_AUDIO_BITRATE = 96_000;
 
 function formatMessageTime(value: string) {
   const date = new Date(value);
@@ -194,6 +199,7 @@ export default function ChatPage() {
   const recordingKindRef = useRef<RecordingKind>(null);
   const discardRecordingRef = useRef(false);
   const restartVideoNoteRef = useRef(false);
+  const videoNoteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cameraFacingRef = useRef<"user" | "environment">("user");
 
   const [friend, setFriend] = useState<FriendRecord | null>(null);
@@ -261,7 +267,9 @@ export default function ChatPage() {
     }
 
     const interval = setInterval(() => {
-      setRecordingSeconds((current) => current + 1);
+      setRecordingSeconds((current) =>
+        recordingKind === "video-note" ? Math.min(MAX_VIDEO_NOTE_SECONDS, current + 1) : current + 1
+      );
     }, 1000);
 
     return () => clearInterval(interval);
@@ -535,6 +543,10 @@ export default function ChatPage() {
         clearTimeout(longPressTimerRef.current);
       }
 
+      if (videoNoteTimeoutRef.current) {
+        clearTimeout(videoNoteTimeoutRef.current);
+      }
+
       mediaRecorderRef.current?.stop();
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
@@ -577,6 +589,13 @@ export default function ChatPage() {
     setReplyTarget(null);
   }
 
+  function clearVideoNoteTimeout() {
+    if (videoNoteTimeoutRef.current) {
+      clearTimeout(videoNoteTimeoutRef.current);
+      videoNoteTimeoutRef.current = null;
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session || !canSend) {
@@ -616,11 +635,13 @@ export default function ChatPage() {
 
     try {
       if (isImage) {
-        await sendImageMessage(supabase, chatId, session.user.id, file, {
+        const optimizedImage = await optimizeImageForUpload(file);
+        await sendImageMessage(supabase, chatId, session.user.id, optimizedImage, {
           replyToMessageId: replyTarget?.id ?? null
         });
       } else {
-        await sendVideoMessage(supabase, chatId, session.user.id, file, {
+        const optimizedVideo = await optimizeVideoForUpload(file);
+        await sendVideoMessage(supabase, chatId, session.user.id, optimizedVideo, {
           replyToMessageId: replyTarget?.id ?? null
         });
       }
@@ -858,6 +879,7 @@ export default function ChatPage() {
   }
 
   function cleanupRecording() {
+    clearVideoNoteTimeout();
     mediaRecorderRef.current = null;
     mediaChunksRef.current = [];
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -890,7 +912,16 @@ export default function ChatPage() {
       );
 
       const mimeType = getSupportedRecorderMime(kind);
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const recorderOptions: MediaRecorderOptions = mimeType ? { mimeType } : {};
+
+      if (kind === "voice") {
+        recorderOptions.audioBitsPerSecond = VOICE_RECORDING_AUDIO_BITRATE;
+      } else {
+        recorderOptions.audioBitsPerSecond = VIDEO_NOTE_RECORDING_AUDIO_BITRATE;
+        recorderOptions.videoBitsPerSecond = VIDEO_NOTE_RECORDING_VIDEO_BITRATE;
+      }
+
+      const recorder = new MediaRecorder(stream, recorderOptions);
 
       mediaStreamRef.current = stream;
       mediaRecorderRef.current = recorder;
@@ -903,6 +934,11 @@ export default function ChatPage() {
 
       if (kind === "video-note") {
         setCameraPreviewStream(stream);
+        clearVideoNoteTimeout();
+        videoNoteTimeoutRef.current = setTimeout(() => {
+          setMessage("Кружок автоматически остановлен: максимум 60 секунд.");
+          stopRecording();
+        }, MAX_VIDEO_NOTE_SECONDS * 1000);
       }
 
       recorder.ondataavailable = (event) => {
@@ -946,6 +982,7 @@ export default function ChatPage() {
   }
 
   function stopRecording(send = true) {
+    clearVideoNoteTimeout();
     const recorder = mediaRecorderRef.current;
     if (!recorder || recorder.state === "inactive") {
       cleanupRecording();
@@ -1218,7 +1255,7 @@ export default function ChatPage() {
           <div className="tg-video-note-recorder-surface">
             <div className="tg-video-note-recorder-head">
               <strong>Запись кружка</strong>
-              <span>{formatRecordingTime(recordingSeconds)}</span>
+              <span>{`${formatRecordingTime(recordingSeconds)} / ${formatRecordingTime(MAX_VIDEO_NOTE_SECONDS)}`}</span>
             </div>
 
             <div className="tg-video-note-recorder-preview">
