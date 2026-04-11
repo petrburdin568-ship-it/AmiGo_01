@@ -36,6 +36,7 @@ import {
   sendVideoNoteMessage,
   sendVoiceMessage
 } from "@/lib/supabase/queries";
+import { CALL_RINGTONE_CHANGE_EVENT, resolveCallRingtoneSource } from "@/lib/call-ringtone";
 import { optimizeImageForUpload, optimizeVideoForUpload } from "@/lib/media-optimizer";
 import type { MessageRow } from "@/lib/supabase/types";
 import { getStickerByValue, STICKER_OPTIONS } from "@/lib/stickers";
@@ -237,6 +238,8 @@ export default function ChatPage() {
   const localCallStreamRef = useRef<MediaStream | null>(null);
   const remoteCallStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ringtoneCleanupRef = useRef<(() => void) | null>(null);
   const cameraFacingRef = useRef<"user" | "environment">("user");
 
   const [friend, setFriend] = useState<FriendRecord | null>(null);
@@ -263,6 +266,7 @@ export default function ChatPage() {
   const [callMuted, setCallMuted] = useState(false);
   const [callDurationSeconds, setCallDurationSeconds] = useState(0);
   const [remoteCallStream, setRemoteCallStream] = useState<MediaStream | null>(null);
+  const [ringtoneSrc, setRingtoneSrc] = useState("/sounds/soft-ping-loop.mp3");
   const [arenaInvite, setArenaInvite] = useState<ArenaInvite | null>(null);
   const [arenaMatch, setArenaMatch] = useState<ArenaMatch | null>(null);
   const [arenaMenuOpen, setArenaMenuOpen] = useState(false);
@@ -354,6 +358,62 @@ export default function ChatPage() {
       void remoteAudioRef.current.play().catch(() => undefined);
     }
   }, [remoteCallStream]);
+
+  useEffect(() => {
+    const ringtone = ringtoneAudioRef.current;
+    if (!ringtone) {
+      return;
+    }
+
+    if (callPhase === "incoming" && incomingCall) {
+      ringtone.currentTime = 0;
+      void ringtone.play().catch(() => undefined);
+      return;
+    }
+
+    ringtone.pause();
+    ringtone.currentTime = 0;
+  }, [callPhase, incomingCall, ringtoneSrc]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    let active = true;
+
+    async function loadRingtoneSource() {
+      const previousCleanup = ringtoneCleanupRef.current;
+      ringtoneCleanupRef.current = null;
+      previousCleanup?.();
+
+      const resolved = await resolveCallRingtoneSource();
+      if (!active) {
+        resolved.revoke?.();
+        return;
+      }
+
+      ringtoneCleanupRef.current = resolved.revoke ?? null;
+      setRingtoneSrc(resolved.src);
+    }
+
+    const handleRingtoneChanged = () => {
+      void loadRingtoneSource();
+    };
+
+    void loadRingtoneSource();
+    window.addEventListener(CALL_RINGTONE_CHANGE_EVENT, handleRingtoneChanged);
+    window.addEventListener("storage", handleRingtoneChanged);
+
+    return () => {
+      active = false;
+      window.removeEventListener(CALL_RINGTONE_CHANGE_EVENT, handleRingtoneChanged);
+      window.removeEventListener("storage", handleRingtoneChanged);
+      const cleanup = ringtoneCleanupRef.current;
+      ringtoneCleanupRef.current = null;
+      cleanup?.();
+    };
+  }, []);
 
   useEffect(() => {
     if (!session || !chatId) {
@@ -995,6 +1055,11 @@ export default function ChatPage() {
 
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = null;
+    }
+
+    if (ringtoneAudioRef.current) {
+      ringtoneAudioRef.current.pause();
+      ringtoneAudioRef.current.currentTime = 0;
     }
 
     setRemoteCallStream(null);
@@ -1723,6 +1788,7 @@ export default function ChatPage() {
     <AppShell mode="chat" title="" description="">
       {message ? <div className="toast-panel tg-chat-toast">{message}</div> : null}
       <audio autoPlay hidden ref={remoteAudioRef} />
+      <audio hidden loop preload="auto" ref={ringtoneAudioRef} src={ringtoneSrc} />
 
       {false && callPhase === "incoming" && incomingCall ? (
         <div className="tg-call-overlay" role="dialog">

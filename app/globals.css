@@ -4627,6 +4627,117 @@ body[data-theme="dark"] .tg-chat-shell {
   gap: 10px;
 }
 
+.settings-ringtone-row {
+  align-items: stretch;
+}
+
+.settings-ringtone-copy {
+  max-width: 360px;
+}
+
+.settings-ringtone-helper,
+.settings-ringtone-message {
+  font-size: 0.82rem;
+}
+
+.settings-ringtone-helper {
+  color: var(--muted);
+}
+
+.settings-ringtone-message {
+  color: color-mix(in srgb, var(--metal) 34%, var(--text));
+  font-weight: 600;
+}
+
+.settings-ringtone-panel {
+  display: flex;
+  min-width: min(100%, 420px);
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-ringtone-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-ringtone-group-title {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settings-ringtone-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-ringtone-option {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--stroke) 62%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg-muted) 88%, transparent);
+  color: var(--text);
+  text-align: left;
+}
+
+.settings-ringtone-option span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.settings-ringtone-option em {
+  color: color-mix(in srgb, var(--metal) 34%, var(--text));
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.settings-ringtone-option-selected {
+  border-color: color-mix(in srgb, var(--metal) 52%, var(--stroke));
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--metal-soft) 24%, transparent), transparent 56%),
+    color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--metal) 12%, transparent);
+}
+
+.settings-ringtone-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--stroke) 62%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg-muted) 88%, transparent);
+}
+
+.settings-ringtone-custom-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-ringtone-custom-copy span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.settings-ringtone-custom-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .discover-plain-block {
   padding: 0;
   border: 0;
@@ -4652,6 +4763,19 @@ body[data-theme="dark"] .tg-chat-shell {
 }
 
 @media (max-width: 640px) {
+  .settings-ringtone-options {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-ringtone-panel {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .settings-ringtone-custom-actions {
+    flex-direction: column;
+  }
+
   .menu-page {
     padding:
       calc(12px + env(safe-area-inset-top))
