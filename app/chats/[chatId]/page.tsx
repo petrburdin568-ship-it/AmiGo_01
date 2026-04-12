@@ -119,6 +119,32 @@ function formatMessageTime(value: string) {
   }).format(date);
 }
 
+function formatConversationDayLabel(value?: string | null) {
+  if (!value) {
+    return "Сегодня";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Сегодня";
+  }
+
+  const now = new Date();
+  const isSameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (isSameDay) {
+    return "Сегодня";
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long"
+  }).format(date);
+}
+
 function getPresenceLabel(friend: FriendRecord | null, typing: boolean) {
   if (!friend) {
     return "";
@@ -343,6 +369,14 @@ export default function ChatPage() {
     });
   }
 
+  function keepLatestMessageVisible() {
+    if (!shouldStickToBottomRef.current) {
+      return;
+    }
+
+    scrollMessagesToBottom("auto");
+  }
+
   useEffect(() => {
     if (videoPreviewRef.current) {
       videoPreviewRef.current.srcObject = cameraPreviewStream;
@@ -384,6 +418,25 @@ export default function ChatPage() {
 
     previousMessagesLengthRef.current = nextLength;
   }, [messages.length]);
+
+  useEffect(() => {
+    if (loadingChat || !friend) {
+      return;
+    }
+
+    shouldStickToBottomRef.current = true;
+    const frameId = window.requestAnimationFrame(() => {
+      scrollMessagesToBottom("auto");
+    });
+    const timeoutId = window.setTimeout(() => {
+      scrollMessagesToBottom("auto");
+    }, 180);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [friend, loadingChat]);
 
   useEffect(() => {
     cameraFacingRef.current = cameraFacingMode;
@@ -1911,6 +1964,9 @@ export default function ChatPage() {
   const isArenaSender = arenaInvite?.senderId === session?.user.id;
   const isArenaRecipient = arenaInvite?.recipientId === session?.user.id;
   const hasArenaMatch = Boolean(arenaInvite?.arenaMatchId);
+  const presenceLabel = getPresenceLabel(friend, otherTyping);
+  const latestMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const dayLabel = formatConversationDayLabel(latestMessage?.sentAt);
   const callStatusLabel =
     callPhase === "outgoing"
       ? "Звоним..."
@@ -2005,6 +2061,29 @@ export default function ChatPage() {
             <button className="tg-call-strip-button tg-call-strip-button-danger" onClick={() => void endAudioCall()} type="button">
               Завершить
             </button>
+
+            {arenaInvite?.status === "accepted" && hasArenaMatch ? (
+              <Link className="button button-secondary tg-arena-call" href={`/arena/${arenaInvite?.arenaMatchId ?? ""}`} onClick={() => setArenaMenuOpen(false)}>
+                РћС‚РєСЂС‹С‚СЊ Р°СЂРµРЅСѓ
+              </Link>
+            ) : null}
+
+            {arenaInvite?.status === "pending" && isArenaRecipient ? (
+              <>
+                <button className="button button-primary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("accepted")} type="button">
+                  РџСЂРёРЅСЏС‚СЊ РІС‹Р·РѕРІ
+                </button>
+                <button className="button button-secondary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("declined")} type="button">
+                  РћС‚РєР»РѕРЅРёС‚СЊ
+                </button>
+              </>
+            ) : null}
+
+            {arenaInvite?.status === "pending" && isArenaSender ? (
+              <button className="button button-secondary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("cancelled")} type="button">
+                РћС‚РјРµРЅРёС‚СЊ РІС‹Р·РѕРІ
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -2161,6 +2240,29 @@ export default function ChatPage() {
             <button className="button button-primary tg-arena-call" disabled={arenaBusy} onClick={() => void handleCreateArenaInvite()} type="button">
               {arenaBusy ? "Отправляем..." : "Вызвать на арену"}
             </button>
+
+            {arenaInvite?.status === "accepted" && hasArenaMatch ? (
+              <Link className="button button-secondary tg-arena-call" href={`/arena/${arenaInvite?.arenaMatchId ?? ""}`} onClick={() => setArenaMenuOpen(false)}>
+                Открыть арену
+              </Link>
+            ) : null}
+
+            {arenaInvite?.status === "pending" && isArenaRecipient ? (
+              <>
+                <button className="button button-primary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("accepted")} type="button">
+                  Принять вызов
+                </button>
+                <button className="button button-secondary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("declined")} type="button">
+                  Отклонить
+                </button>
+              </>
+            ) : null}
+
+            {arenaInvite?.status === "pending" && isArenaSender ? (
+              <button className="button button-secondary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("cancelled")} type="button">
+                Отменить вызов
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -2197,107 +2299,49 @@ export default function ChatPage() {
         <div className="tg-chat-top">
           <div className="tg-chatbar">
             <div className="tg-chatbar-main">
-              <Link className="tg-chatbar-back" href="/chats">
-                Назад
+              <Link aria-label="Назад к чатам" className="tg-chatbar-back" href="/chats">
+                <span className="tg-chatbar-back-icon">←</span>
               </Link>
 
               <Link className="tg-chatbar-user" href={`/friends/${friend.friendshipId}`}>
                 <UserAvatar className="tg-chat-avatar" name={friend.profile.name} size="sm" src={friend.profile.avatar} />
                 <div className="tg-chatbar-copy">
+                  <span className="tg-chatbar-label">AmiGo chat</span>
                   <strong>{friend.profile.name}</strong>
-                  <span>{getPresenceLabel(friend, otherTyping)}</span>
+                  <span className="tg-chatbar-presence">{presenceLabel}</span>
                 </div>
               </Link>
             </div>
 
             <div className="tg-chatbar-actions">
               <button
-                aria-label="Позвонить"
+                aria-label="Аудиозвонок"
                 className={`tg-chatbar-call ${callPhase !== "idle" ? "tg-chatbar-call-active" : ""}`}
                 disabled={callPhase !== "idle" || !callFeatureAvailable()}
                 onClick={() => void startAudioCall()}
                 type="button"
               >
-                Звонок
+                Аудио
               </button>
-              <span className="tg-chatbar-status">{getPresenceLabel(friend, otherTyping)}</span>
-              <Link className="tg-chatbar-profile" href={`/friends/${friend.friendshipId}`}>
-                Профиль
-              </Link>
+              <button
+                aria-label="Открыть арену"
+                className={`tg-chatbar-arena ${arenaInvite?.status === "pending" ? "tg-chatbar-arena-active" : ""}`}
+                onClick={() => setArenaMenuOpen(true)}
+                type="button"
+              >
+                <span className="tg-chatbar-arena-icon">⚔</span>
+              </button>
             </div>
           </div>
-
         </div>
 
-        {arenaInvite ? (
-          <div className="tg-chat-banner-slot">
-            <div className="tg-arena-banner">
-              <div className="tg-arena-banner-copy">
-                <strong>
-                  {arenaInvite.status === "pending"
-                    ? isArenaSender
-                      ? "Вызов на арену отправлен"
-                      : "Тебя вызвали на арену"
-                    : arenaInvite.status === "accepted"
-                      ? "Арена готова"
-                      : arenaInvite.status === "declined"
-                        ? "Вызов на арену отклонён"
-                        : "Вызов на арену отменён"}
-                </strong>
-                <span>
-                  {arenaInvite.status === "pending"
-                    ? isArenaSender
-                      ? "Ждём, пока соперник примет дуэль."
-                      : "Прими вызов и подготовь своего бойца."
-                    : arenaInvite.status === "accepted"
-                      ? arenaMatch?.status === "finished"
-                        ? "Бой завершён. Результат всё ещё можно открыть."
-                        : "Открой арену и продолжай бой."
-                      : "Можно отправить новый вызов в любой момент."}
-                </span>
-              </div>
-
-              <div className="tg-arena-banner-actions">
-                {arenaInvite.status === "pending" && isArenaRecipient ? (
-                  <>
-                    <button className="tg-arena-inline-action tg-arena-inline-action-primary" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("accepted")} type="button">
-                      Принять
-                    </button>
-                    <button className="tg-arena-inline-action" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("declined")} type="button">
-                      Отклонить
-                    </button>
-                  </>
-                ) : null}
-
-                {arenaInvite.status === "pending" && isArenaSender ? (
-                  <button className="tg-arena-inline-action" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("cancelled")} type="button">
-                    Отменить
-                  </button>
-                ) : null}
-
-                {arenaInvite.status === "accepted" && hasArenaMatch ? (
-                  <Link className="tg-arena-inline-action tg-arena-inline-action-primary" href={`/arena/${arenaInvite.arenaMatchId}`}>
-                    Открыть арену
-                  </Link>
-                ) : null}
-
-                {arenaInvite.status !== "pending" ? (
-                  <button className="tg-arena-inline-action" onClick={() => setArenaMenuOpen(true)} type="button">
-                    Новая дуэль
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        ) : null}
-
         <div className="tg-chat-messages" ref={messagesViewportRef}>
-          <div className="tg-service-badge">Сегодня</div>
+          <div className="tg-service-badge">{dayLabel}</div>
 
           {messages.length === 0 ? (
             <div className="tg-chat-empty">
               <strong>Чат открыт</strong>
-              <p>Отправь первое сообщение, стикер, голосовое, кружок или медиа.</p>
+              <p>Напиши первое сообщение или отправь голосовое, чтобы начать разговор.</p>
             </div>
           ) : (
             messages.map((item) => (
@@ -2328,7 +2372,7 @@ export default function ChatPage() {
                     tabIndex={0}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="Вложение" className="tg-bubble-image" src={item.mediaUrl} />
+                    <img alt="Вложение" className="tg-bubble-image" onLoad={() => keepLatestMessageVisible()} src={item.mediaUrl} />
                   </div>
                 ) : null}
 
@@ -2341,7 +2385,7 @@ export default function ChatPage() {
                     role="button"
                     tabIndex={0}
                   >
-                    <video className="tg-bubble-video" controls preload="metadata" src={item.mediaUrl} />
+                    <video className="tg-bubble-video" controls onLoadedMetadata={() => keepLatestMessageVisible()} preload="metadata" src={item.mediaUrl} />
                   </div>
                 ) : null}
 
@@ -2358,7 +2402,7 @@ export default function ChatPage() {
                     role="button"
                     tabIndex={0}
                   >
-                    <video autoPlay className="tg-bubble-video-note" loop muted playsInline preload="metadata" src={item.mediaUrl} />
+                    <video autoPlay className="tg-bubble-video-note" loop muted onLoadedMetadata={() => keepLatestMessageVisible()} playsInline preload="metadata" src={item.mediaUrl} />
                     <span className="tg-video-note-play">▶</span>
                     <span className="tg-video-note-ring" />
                   </div>
@@ -2386,16 +2430,12 @@ export default function ChatPage() {
             <div className="tg-media-panel">
               <div className="tg-media-actions">
                 <button className="tg-media-action" onClick={() => handleFileAction()} type="button">
-                  <span>🖼</span>
-                  <strong>Фото и видео</strong>
+                  <span>◫</span>
+                  <strong>Медиа</strong>
                 </button>
                 <button className="tg-media-action" onClick={() => void handleVoiceAction()} type="button">
-                  <span>🎙</span>
-                  <strong>Голосовое</strong>
-                </button>
-                <button className="tg-media-action" onClick={() => void handleVideoNoteAction()} type="button">
                   <span>◉</span>
-                  <strong>Кружок</strong>
+                  <strong>Голосовое</strong>
                 </button>
               </div>
 
@@ -2436,7 +2476,7 @@ export default function ChatPage() {
           {recordingKind && recordingKind !== "video-note" ? (
             <div className="tg-recording-bar">
               <div className="tg-recording-copy">
-                <strong>{recordingKind === "voice" ? "Идёт запись голосового" : "Идёт запись кружка"}</strong>
+                <strong>Идёт запись голосового</strong>
                 <span>{formatRecordingTime(recordingSeconds)}</span>
               </div>
 
@@ -2451,39 +2491,41 @@ export default function ChatPage() {
 
           <input accept="image/*,video/*" className="tg-file-input" onChange={handleMediaSelect} ref={fileInputRef} type="file" />
 
-          <button
-            aria-label="Открыть арену"
-            className={`tg-compose-icon tg-compose-swords ${arenaInvite?.status === "pending" ? "tg-compose-icon-active" : ""}`}
-            onClick={() => setArenaMenuOpen(true)}
-            type="button"
-          >
-            ⚔
-          </button>
+          <div className="tg-chat-compose-row">
+            <button
+              aria-label="Открыть меню вложений"
+              className={`tg-compose-icon ${stickersOpen ? "tg-compose-icon-active" : ""}`}
+              onClick={() => toggleMediaMenu()}
+              type="button"
+            >
+              +
+            </button>
 
-          <button
-            aria-label="Открыть меню вложений"
-            className={`tg-compose-icon ${stickersOpen ? "tg-compose-icon-active" : ""}`}
-            onClick={() => toggleMediaMenu()}
-            type="button"
-          >
-            +
-          </button>
+            <button
+              aria-label="Открыть арену"
+              className={`tg-compose-icon tg-compose-swords ${arenaInvite?.status === "pending" ? "tg-compose-icon-active" : ""}`}
+              onClick={() => setArenaMenuOpen(true)}
+              type="button"
+            >
+              ⚔
+            </button>
 
-          <textarea
-            onChange={(event) => {
-              resizeComposerTextarea(event.target);
-              handleDraftChange(event.target.value);
-            }}
-            onFocus={handleComposerFocus}
-            ref={composerTextareaRef}
-            placeholder={uploadingMedia ? "Отправляем файл..." : recordingKind ? "Сначала заверши запись" : "Сообщение"}
-            rows={1}
-            value={draft}
-          />
+            <textarea
+              onChange={(event) => {
+                resizeComposerTextarea(event.target);
+                handleDraftChange(event.target.value);
+              }}
+              onFocus={handleComposerFocus}
+              ref={composerTextareaRef}
+              placeholder={uploadingMedia ? "Отправляем файл..." : recordingKind ? "Сначала заверши запись" : "Сообщение"}
+              rows={1}
+              value={draft}
+            />
 
-          <button className="tg-compose-send" disabled={!canSend} type="submit">
-            Отпр.
-          </button>
+            <button className="tg-compose-send" disabled={!canSend} type="submit">
+              →
+            </button>
+          </div>
         </form>
       </section>
     </AppShell>
