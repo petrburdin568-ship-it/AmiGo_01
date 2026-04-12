@@ -1310,6 +1310,69 @@ body[data-theme="dark"] .compatibility-badge {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
+.tg-activity-stack {
+  position: fixed;
+  top: calc(18px + env(safe-area-inset-top));
+  right: 18px;
+  z-index: 120;
+  display: flex;
+  width: min(360px, calc(100vw - 24px));
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tg-activity-toast {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tg-activity-toast-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tg-activity-toast-copy strong,
+.tg-activity-toast-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tg-activity-toast-copy span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.tg-activity-toast-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tg-activity-toast-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--stroke) 72%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-muted) 88%, transparent);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.tg-activity-toast-button-primary {
+  border-color: color-mix(in srgb, var(--metal) 48%, var(--stroke));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--metal-soft) 60%, transparent), color-mix(in srgb, var(--bg-muted) 84%, transparent));
+  color: color-mix(in srgb, var(--metal) 56%, var(--text));
+}
+
 .auth-card {
   max-width: 520px;
 }
@@ -2177,13 +2240,16 @@ body[data-theme="dark"] .tg-chat-shell {
 .tg-chat-top {
   position: sticky;
   top: 0;
-  z-index: 8;
+  z-index: 14;
   display: flex;
   min-height: 0;
   flex-direction: column;
 }
 
 .tg-chatbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2299,16 +2365,25 @@ body[data-theme="dark"] .tg-chat-shell {
   white-space: nowrap;
 }
 
+.tg-chat-banner-slot {
+  padding: 12px 18px 0;
+}
+
 .tg-chat-messages {
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-height: 0;
   overflow: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   scroll-padding-bottom: 24px;
   padding: 18px 18px 12px;
+}
+
+.tg-chat-messages > * {
+  min-width: 0;
 }
 
 .tg-chat-end-anchor {
@@ -2342,6 +2417,10 @@ body[data-theme="dark"] .tg-chat-shell {
     radial-gradient(circle at top, rgba(75, 181, 128, 0.16), transparent 54%),
     color-mix(in srgb, var(--bg-elevated) 96%, transparent);
   box-shadow: 0 24px 56px rgba(0, 0, 0, 0.24);
+}
+
+.tg-global-call-card {
+  width: min(100%, 380px);
 }
 
 .tg-call-card-avatar {
@@ -2674,11 +2753,15 @@ body[data-theme="dark"] .tg-chat-shell {
 }
 
 .tg-bubble {
+  box-sizing: border-box;
+  width: fit-content;
+  min-width: 0;
   max-width: min(68%, 520px);
   padding: 8px 10px 7px;
   border-radius: 18px;
   line-height: 1.48;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   border: 1px solid transparent;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
 }
@@ -2773,6 +2856,7 @@ body[data-theme="dark"] .tg-chat-shell {
 
 .tg-bubble-out {
   align-self: flex-end;
+  margin-left: auto;
   border-top-right-radius: 10px;
   border-color: color-mix(in srgb, var(--metal) 58%, transparent);
   background: linear-gradient(
@@ -2787,7 +2871,9 @@ body[data-theme="dark"] .tg-chat-shell {
 }
 
 .tg-bubble-text {
+  max-width: 100%;
   word-break: break-word;
+  overflow-wrap: anywhere;
   font-size: 0.95rem;
 }
 
@@ -3454,8 +3540,15 @@ body[data-theme="dark"] .tg-chat-shell {
     max-width: none;
   }
 
+  .tg-activity-stack {
+    top: calc(12px + env(safe-area-inset-top));
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+
   .tg-bubble {
-    max-width: 88%;
+    max-width: min(calc(100% - 18px), 88%);
     padding: 10px 12px 8px;
   }
 
@@ -3474,6 +3567,10 @@ body[data-theme="dark"] .tg-chat-shell {
   .tg-chat-compose textarea {
     min-height: 44px;
     padding: 11px 14px;
+  }
+
+  .tg-chat-banner-slot {
+    padding: 10px 12px 0;
   }
 
   .tg-call-strip {
@@ -3540,8 +3637,17 @@ body[data-theme="dark"] .tg-chat-shell {
     border-radius: 20px;
   }
 
+  .tg-activity-toast {
+    flex-direction: column;
+  }
+
+  .tg-activity-toast-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
   .tg-bubble {
-    max-width: 90%;
+    max-width: calc(100% - 12px);
   }
 
   .tg-compose-icon {

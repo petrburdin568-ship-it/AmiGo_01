@@ -163,6 +163,9 @@ export default function FriendProfilePage() {
         <div className="reference-divider" />
 
         <div className="reference-bottom-action">
+          <Link className="button button-secondary" href={`/chats/${friend.friendshipId}?startCall=1`}>
+            Позвонить
+          </Link>
           <Link className="button button-primary" href={`/chats/${friend.friendshipId}`}>
             Открыть чат
           </Link>

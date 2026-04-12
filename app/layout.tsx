@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "@/app/globals.css";
 import { AuthProvider } from "@/components/auth-provider";
+import { GlobalActivity } from "@/components/global-activity";
 import { LanguageProvider } from "@/components/language-provider";
 import { Navigation } from "@/components/navigation";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -39,6 +40,7 @@ export default function RootLayout({
               <div className="background-orb background-orb-left" />
               <div className="background-orb background-orb-right" />
               <div className="page-shell app-frame">
+                <GlobalActivity />
                 <Navigation />
                 <main className="main-content">{children}</main>
               </div>

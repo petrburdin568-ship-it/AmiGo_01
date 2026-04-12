@@ -2,7 +2,7 @@
 
 import type { RealtimeChannel, RealtimePostgresInsertPayload } from "@supabase/supabase-js";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   type ChangeEvent,
   type FormEvent,
@@ -214,6 +214,8 @@ function clampContextMenuPosition(x: number, y: number, width: number, height: n
 
 export default function ChatPage() {
   const params = useParams<{ chatId: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const chatId = typeof params.chatId === "string" ? params.chatId : "";
   const { loading, session, supabase } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -251,6 +253,9 @@ export default function ChatPage() {
   const cameraFacingRef = useRef<"user" | "environment">("user");
   const shouldStickToBottomRef = useRef(true);
   const previousMessagesLengthRef = useRef(0);
+  const handledAutoCallRef = useRef("");
+  const startAudioCallRef = useRef<() => Promise<void>>(async () => undefined);
+  const acceptIncomingCallRef = useRef<() => Promise<void>>(async () => undefined);
 
   const [friend, setFriend] = useState<FriendRecord | null>(null);
   const [rawMessages, setRawMessages] = useState<ChatMessage[]>([]);
@@ -1566,6 +1571,9 @@ export default function ChatPage() {
     }
   }
 
+  startAudioCallRef.current = startAudioCall;
+  acceptIncomingCallRef.current = acceptIncomingCall;
+
   async function declineIncomingCall() {
     try {
       await rejectIncomingCall("declined");
@@ -1586,6 +1594,56 @@ export default function ChatPage() {
     });
     setCallMuted(nextMuted);
   }
+
+  useEffect(() => {
+    const shouldStartCall = searchParams.get("startCall") === "1";
+    const currentKey = shouldStartCall ? `start:${chatId}` : "";
+
+    if (!shouldStartCall || !session || !friend || handledAutoCallRef.current === currentKey) {
+      return;
+    }
+
+    handledAutoCallRef.current = currentKey;
+
+    void startAudioCallRef.current().finally(() => {
+      router.replace(`/chats/${chatId}`);
+    });
+  }, [chatId, friend, router, searchParams, session]);
+
+  useEffect(() => {
+    const incomingSessionId = searchParams.get("incomingSessionId");
+    const incomingFromUserId = searchParams.get("incomingFromUserId");
+    const currentKey = incomingSessionId && incomingFromUserId ? `incoming:${incomingSessionId}` : "";
+
+    if (
+      !incomingSessionId ||
+      !incomingFromUserId ||
+      !session ||
+      !friend ||
+      friend.profile.id !== incomingFromUserId ||
+      handledAutoCallRef.current === currentKey
+    ) {
+      return;
+    }
+
+    handledAutoCallRef.current = currentKey;
+    incomingCallRef.current = {
+      sessionId: incomingSessionId,
+      fromUserId: incomingFromUserId
+    };
+    setIncomingCall({
+      sessionId: incomingSessionId,
+      fromUserId: incomingFromUserId
+    });
+    callSessionIdRef.current = incomingSessionId;
+    callPhaseRef.current = "incoming";
+    setCallSessionId(incomingSessionId);
+    setCallPhase("incoming");
+
+    void acceptIncomingCallRef.current().finally(() => {
+      router.replace(`/chats/${chatId}`);
+    });
+  }, [chatId, friend, router, searchParams, session]);
 
   async function finishRecording(kind: "voice" | "video-note", blob: Blob) {
     if (!session) {
@@ -2169,7 +2227,10 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {arenaInvite ? (
+        </div>
+
+        {arenaInvite ? (
+          <div className="tg-chat-banner-slot">
             <div className="tg-arena-banner">
               <div className="tg-arena-banner-copy">
                 <strong>
@@ -2227,8 +2288,8 @@ export default function ChatPage() {
                 ) : null}
               </div>
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         <div className="tg-chat-messages" ref={messagesViewportRef}>
           <div className="tg-service-badge">Сегодня</div>

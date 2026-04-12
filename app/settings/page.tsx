@@ -6,6 +6,11 @@ import { AppShell } from "@/components/app-shell";
 import { useLanguage } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import {
+  getBrowserNotificationPermission,
+  requestBrowserNotificationPermission,
+  type BrowserNotificationPermissionState
+} from "@/lib/browser-notifications";
+import {
   BUILT_IN_CALL_RINGTONES,
   getStoredCallRingtoneVolume,
   getStoredCallVibrationEnabled,
@@ -35,6 +40,7 @@ export default function SettingsPage() {
   const [ringtoneVolume, setRingtoneVolume] = useState(() => getStoredCallRingtoneVolume());
   const [callVibrationEnabled, setCallVibrationEnabledState] = useState(() => getStoredCallVibrationEnabled());
   const [previewingId, setPreviewingId] = useState<"custom" | (typeof BUILT_IN_CALL_RINGTONES)[number]["id"] | "">("");
+  const [notificationPermission, setNotificationPermission] = useState<BrowserNotificationPermissionState>(() => getBrowserNotificationPermission());
 
   const copy =
     language === "ru"
@@ -68,6 +74,13 @@ export default function SettingsPage() {
           vibrationText: "Если устройство поддерживает вибрацию, звонок будет дополнительно вибрировать.",
           vibrationOn: "Включена",
           vibrationOff: "Выключена",
+          notificationsLabel: "Браузерные уведомления",
+          notificationsText: "Показывают входящие звонки, новые сообщения и заявки даже вне открытого чата.",
+          notificationsEnable: "Включить",
+          notificationsEnabled: "Разрешены",
+          notificationsDenied: "Заблокированы",
+          notificationsDefault: "Не включены",
+          notificationsUnsupported: "Не поддерживаются",
           russian: "Русский",
           english: "English"
         }
@@ -101,6 +114,13 @@ export default function SettingsPage() {
           vibrationText: "If the device supports vibration, incoming calls will vibrate too.",
           vibrationOn: "Enabled",
           vibrationOff: "Disabled",
+          notificationsLabel: "Browser notifications",
+          notificationsText: "Shows incoming calls, new messages, and friend requests even outside the active chat.",
+          notificationsEnable: "Enable",
+          notificationsEnabled: "Allowed",
+          notificationsDenied: "Blocked",
+          notificationsDefault: "Not enabled",
+          notificationsUnsupported: "Unsupported",
           russian: "Russian",
           english: "English"
         };
@@ -153,6 +173,19 @@ export default function SettingsPage() {
       previewAudioRef.current.volume = ringtoneVolume;
     }
   }, [ringtoneVolume]);
+
+  useEffect(() => {
+    function syncPermission() {
+      setNotificationPermission(getBrowserNotificationPermission());
+    }
+
+    syncPermission();
+    window.addEventListener("focus", syncPermission);
+
+    return () => {
+      window.removeEventListener("focus", syncPermission);
+    };
+  }, []);
 
   function handleSelectBuiltInRingtone(id: (typeof BUILT_IN_CALL_RINGTONES)[number]["id"]) {
     const nextChoice: CallRingtoneChoice = {
@@ -220,6 +253,11 @@ export default function SettingsPage() {
     setStoredCallVibrationEnabled(nextValue);
     setCallVibrationEnabledState(nextValue);
     setRingtoneMessage("");
+  }
+
+  async function handleNotificationPermissionRequest() {
+    const nextPermission = await requestBrowserNotificationPermission();
+    setNotificationPermission(nextPermission);
   }
 
   async function stopPreview() {
@@ -443,6 +481,30 @@ export default function SettingsPage() {
           <button className="button button-secondary" onClick={handleVibrationToggle} type="button">
             {callVibrationEnabled ? copy.vibrationOn : copy.vibrationOff}
           </button>
+        </div>
+
+        <div className="reference-action-row settings-row">
+          <div className="stack-xs">
+            <div className="panel-title">{copy.notificationsLabel}</div>
+            <p className="reference-sheet-copy">{copy.notificationsText}</p>
+          </div>
+
+          <div className="settings-ringtone-option-action">
+            <strong>
+              {notificationPermission === "granted"
+                ? copy.notificationsEnabled
+                : notificationPermission === "denied"
+                  ? copy.notificationsDenied
+                  : notificationPermission === "unsupported"
+                    ? copy.notificationsUnsupported
+                    : copy.notificationsDefault}
+            </strong>
+            {notificationPermission === "default" ? (
+              <button className="button button-primary" onClick={() => void handleNotificationPermissionRequest()} type="button">
+                {copy.notificationsEnable}
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <AdminConsole />
