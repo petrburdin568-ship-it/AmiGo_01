@@ -2323,14 +2323,6 @@ export default function ChatPage() {
               >
                 Аудио
               </button>
-              <button
-                aria-label="Открыть арену"
-                className={`tg-chatbar-arena ${arenaInvite?.status === "pending" ? "tg-chatbar-arena-active" : ""}`}
-                onClick={() => setArenaMenuOpen(true)}
-                type="button"
-              >
-                <span className="tg-chatbar-arena-icon">⚔</span>
-              </button>
             </div>
           </div>
         </div>
@@ -2436,6 +2428,10 @@ export default function ChatPage() {
                 <button className="tg-media-action" onClick={() => void handleVoiceAction()} type="button">
                   <span>◉</span>
                   <strong>Голосовое</strong>
+                </button>
+                <button className="tg-media-action" onClick={() => void handleVideoNoteAction()} type="button">
+                  <span>◉</span>
+                  <strong>Кружок</strong>
                 </button>
               </div>
 
