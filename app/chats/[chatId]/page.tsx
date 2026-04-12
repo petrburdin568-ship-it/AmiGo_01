@@ -217,6 +217,9 @@ export default function ChatPage() {
   const chatId = typeof params.chatId === "string" ? params.chatId : "";
   const { loading, session, supabase } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingChannelRef = useRef<RealtimeChannel | null>(null);
@@ -246,6 +249,8 @@ export default function ChatPage() {
   const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
   const ringtoneCleanupRef = useRef<(() => void) | null>(null);
   const cameraFacingRef = useRef<"user" | "environment">("user");
+  const shouldStickToBottomRef = useRef(true);
+  const previousMessagesLengthRef = useRef(0);
 
   const [friend, setFriend] = useState<FriendRecord | null>(null);
   const [rawMessages, setRawMessages] = useState<ChatMessage[]>([]);
@@ -304,11 +309,76 @@ export default function ChatPage() {
     }));
   }, [rawMessages]);
 
+  function resizeComposerTextarea(textarea: HTMLTextAreaElement | null = composerTextareaRef.current) {
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "0px";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }
+
+  function scrollMessagesToBottom(behavior: ScrollBehavior = "smooth") {
+    const messagesViewport = messagesViewportRef.current;
+    if (!messagesViewport) {
+      return;
+    }
+
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        block: "end",
+        behavior
+      });
+      return;
+    }
+
+    messagesViewport.scrollTo({
+      top: messagesViewport.scrollHeight,
+      behavior
+    });
+  }
+
   useEffect(() => {
     if (videoPreviewRef.current) {
       videoPreviewRef.current.srcObject = cameraPreviewStream;
     }
   }, [cameraPreviewStream]);
+
+  useEffect(() => {
+    resizeComposerTextarea();
+  }, [draft, recordingKind, replyTarget, uploadingMedia]);
+
+  useEffect(() => {
+    const messagesViewport = messagesViewportRef.current;
+    if (!messagesViewport) {
+      return;
+    }
+
+    const updateStickToBottom = () => {
+      const remainingOffset = messagesViewport.scrollHeight - messagesViewport.scrollTop - messagesViewport.clientHeight;
+      shouldStickToBottomRef.current = remainingOffset < 120;
+    };
+
+    updateStickToBottom();
+    messagesViewport.addEventListener("scroll", updateStickToBottom, { passive: true });
+
+    return () => {
+      messagesViewport.removeEventListener("scroll", updateStickToBottom);
+    };
+  }, []);
+
+  useEffect(() => {
+    const previousLength = previousMessagesLengthRef.current;
+    const nextLength = messages.length;
+
+    if (nextLength > previousLength && (previousLength === 0 || shouldStickToBottomRef.current)) {
+      window.requestAnimationFrame(() => {
+        scrollMessagesToBottom(previousLength === 0 ? "auto" : "smooth");
+      });
+    }
+
+    previousMessagesLengthRef.current = nextLength;
+  }, [messages.length]);
 
   useEffect(() => {
     cameraFacingRef.current = cameraFacingMode;
@@ -831,6 +901,7 @@ export default function ChatPage() {
       await sendMessage(supabase, chatId, session.user.id, draft, {
         replyToMessageId: replyTarget?.id ?? null
       });
+      shouldStickToBottomRef.current = true;
       setDraft("");
       setMessage("");
       clearReply();
@@ -1704,6 +1775,13 @@ export default function ChatPage() {
     setStickersOpen((current) => !current);
   }
 
+  function handleComposerFocus() {
+    window.setTimeout(() => {
+      shouldStickToBottomRef.current = true;
+      scrollMessagesToBottom("smooth");
+    }, 120);
+  }
+
   async function handleVoiceAction() {
     setStickersOpen(false);
     await toggleVoiceRecording();
@@ -2152,7 +2230,7 @@ export default function ChatPage() {
           ) : null}
         </div>
 
-        <div className="tg-chat-messages">
+        <div className="tg-chat-messages" ref={messagesViewportRef}>
           <div className="tg-service-badge">Сегодня</div>
 
           {messages.length === 0 ? (
@@ -2239,6 +2317,7 @@ export default function ChatPage() {
               </div>
             ))
           )}
+          <div aria-hidden className="tg-chat-end-anchor" ref={messagesEndRef} />
         </div>
 
         <form className="tg-chat-compose" onSubmit={handleSubmit}>
@@ -2330,7 +2409,12 @@ export default function ChatPage() {
           </button>
 
           <textarea
-            onChange={(event) => handleDraftChange(event.target.value)}
+            onChange={(event) => {
+              resizeComposerTextarea(event.target);
+              handleDraftChange(event.target.value);
+            }}
+            onFocus={handleComposerFocus}
+            ref={composerTextareaRef}
             placeholder={uploadingMedia ? "Отправляем файл..." : recordingKind ? "Сначала заверши запись" : "Сообщение"}
             rows={1}
             value={draft}
