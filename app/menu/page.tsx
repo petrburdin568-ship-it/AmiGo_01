@@ -60,12 +60,17 @@ export default function MenuPage() {
         };
 
   const links = [
-    { href: "/profile", label: copy.profile, hint: copy.profileHint },
-    { href: "/chats", label: copy.chats, hint: copy.chatsHint },
-    { href: "/friends", label: copy.friends, hint: copy.friendsHint },
-    { href: "/requests", label: copy.requests, hint: copy.requestsHint },
-    { href: "/settings", label: copy.settings, hint: copy.settingsHint }
+    { href: "/profile", label: copy.profile, hint: copy.profileHint, mark: "ID" },
+    { href: "/chats", label: copy.chats, hint: copy.chatsHint, mark: "DM" },
+    { href: "/friends", label: copy.friends, hint: copy.friendsHint, mark: "FR" },
+    { href: "/requests", label: copy.requests, hint: copy.requestsHint, mark: "RQ" },
+    { href: "/settings", label: copy.settings, hint: copy.settingsHint, mark: "ST" }
   ] as const;
+  const sectionsLabel = language === "ru" ? `${links.length} разделов` : `${links.length} sections`;
+  const quickAccessLabel = language === "ru" ? "Быстрый доступ" : "Quick access";
+  const themeSectionLabel = language === "ru" ? "Оформление" : "Appearance";
+  const themeStateLabel = language === "ru" ? (theme === "light" ? "Светлая" : "Тёмная") : theme === "light" ? "Light" : "Dark";
+  const accountStateLabel = language === "ru" ? (session ? "Аккаунт активен" : "Гостевой режим") : session ? "Account active" : "Guest mode";
 
   return (
     <main className="menu-page modern-menu-page">
@@ -75,42 +80,59 @@ export default function MenuPage() {
             <span className="modern-kicker">{copy.subtitle}</span>
             <h1 className="modern-screen-title">{copy.title}</h1>
             <p className="modern-screen-text">{copy.lead}</p>
+            <div className="modern-menu-meta">
+              <span className="modern-menu-meta-pill">{sectionsLabel}</span>
+              <span className="modern-menu-meta-pill">{quickAccessLabel}</span>
+            </div>
           </div>
 
-          <button aria-label={copy.back} className="menu-close modern-menu-close" onClick={() => router.back()} type="button">
-            {copy.back}
-          </button>
+          <div className="modern-menu-side">
+            <button aria-label={copy.back} className="menu-close modern-menu-close" onClick={() => router.back()} type="button">
+              {copy.back}
+            </button>
+            <div className="modern-menu-status">
+              <span className="modern-menu-status-label">{copy.account}</span>
+              <strong>{session?.user.email ?? copy.noAuth}</strong>
+            </div>
+          </div>
         </header>
 
         <nav className="modern-menu-links">
           {links.map((link) => (
             <Link key={link.href} className="modern-menu-link" href={link.href}>
+              <span className="modern-menu-link-mark">{link.mark}</span>
               <span className="modern-menu-link-copy">
                 <strong>{link.label}</strong>
                 <span>{link.hint}</span>
               </span>
-              <span className="modern-menu-arrow">›</span>
+              <span className="modern-menu-arrow">{">"}</span>
             </Link>
           ))}
         </nav>
 
         <div className="menu-footer modern-menu-footer">
-          <button className="theme-toggle modern-theme-toggle" onClick={toggleTheme} type="button">
-            <span className="theme-toggle-label">{theme === "light" ? copy.darkTheme : copy.lightTheme}</span>
-            <span className="theme-toggle-badge">{theme === "light" ? "Dark" : "Light"}</span>
-          </button>
+          <div className="modern-menu-tools">
+            <button className="theme-toggle modern-theme-toggle" onClick={toggleTheme} type="button">
+              <span className="modern-theme-copy">
+                <span className="modern-tool-kicker">{themeSectionLabel}</span>
+                <span className="theme-toggle-label">{theme === "light" ? copy.darkTheme : copy.lightTheme}</span>
+              </span>
+              <span className="theme-toggle-badge">{themeStateLabel}</span>
+            </button>
 
-          <div className="session-box modern-account-box">
-            <span className="session-label">{copy.account}</span>
-            <strong className="menu-account-email">{session?.user.email ?? copy.noAuth}</strong>
+            <div className="session-box modern-account-box">
+              <span className="modern-tool-kicker">{copy.account}</span>
+              <strong className="menu-account-email">{session?.user.email ?? copy.noAuth}</strong>
+              <span className="modern-account-status">{accountStateLabel}</span>
+            </div>
           </div>
 
           {session ? (
-            <button className="button button-secondary" onClick={() => void signOut()} type="button">
+            <button className="button button-secondary modern-menu-action" onClick={() => void signOut()} type="button">
               {copy.signOut}
             </button>
           ) : (
-            <Link className="button button-primary" href="/auth">
+            <Link className="button button-primary modern-menu-action" href="/auth">
               {copy.signIn}
             </Link>
           )}

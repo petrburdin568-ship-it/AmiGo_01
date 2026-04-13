@@ -108,7 +108,7 @@ export default function RequestsPage() {
           <input
             className="reference-search-input"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder=""
+            placeholder="Поиск по заявкам"
             value={query}
           />
         </div>

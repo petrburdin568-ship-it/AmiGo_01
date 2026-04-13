@@ -93,7 +93,7 @@ export default function FriendsPage() {
           <input
             className="reference-search-input"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder=""
+            placeholder="Поиск по друзьям"
             value={query}
           />
         </div>
