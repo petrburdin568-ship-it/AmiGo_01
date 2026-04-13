@@ -16,6 +16,10 @@ export function Navigation() {
       return true;
     }
 
+    if (pathname.startsWith("/chats/")) {
+      return true;
+    }
+
     if (!session && (pathname === "/" || pathname === "/auth" || pathname === "/auth/reset-password")) {
       return true;
     }
