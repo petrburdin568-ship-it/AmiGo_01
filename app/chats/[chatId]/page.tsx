@@ -19,16 +19,12 @@ import { useAuth } from "@/components/auth-provider";
 import { UserAvatar } from "@/components/user-avatar";
 import {
   appendIncomingMessage,
-  createArenaInvite,
-  getArenaMatch,
-  getLatestArenaInvite,
   deleteMessageForEveryone,
   forwardMessage,
   getFriendshipDetails,
   listFriends,
   listMessages,
   markFriendshipRead,
-  respondArenaInvite,
   sendImageMessage,
   sendMessage,
   sendStickerMessage,
@@ -47,8 +43,6 @@ import { optimizeImageForUpload, optimizeVideoForUpload } from "@/lib/media-opti
 import type { MessageRow } from "@/lib/supabase/types";
 import { getStickerByValue, STICKER_OPTIONS } from "@/lib/stickers";
 import type {
-  ArenaInvite,
-  ArenaMatch,
   ChatMessage,
   ChatMessageReply,
   FriendRecord
