@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">AmiGo</string>
-    <string name="title_activity_main">AmiGo</string>
-    <string name="package_name">com.amigo.app</string>
-    <string name="custom_url_scheme">com.amigo.app</string>
-</resources>
