@@ -14,7 +14,6 @@ import type {
   FriendRecord,
   FriendRequestDirection,
   FriendRequestRecord,
-  Interest,
   PersonalityTag,
   UserTitle,
   UserProfile
@@ -29,7 +28,6 @@ export type ProfileRow = {
   age: number;
   bio: string;
   avatar_url: string;
-  interests: string[];
   friendship_goal: FriendshipGoal;
   communication_formats: string[];
   personality_tags: string[];
@@ -136,7 +134,6 @@ export function mapProfileRow(row: ProfileRow): UserProfile {
     age: row.age,
     bio: row.bio,
     avatar: row.avatar_url,
-    interests: row.interests as Interest[],
     friendshipGoal: row.friendship_goal,
     communicationFormats: row.communication_formats as CommunicationFormat[],
     personalityTags: row.personality_tags as PersonalityTag[],
@@ -162,7 +159,6 @@ export function mapPublicProfileRow(row: PublicProfileRow): UserProfile {
     age: row.age,
     bio: row.bio,
     avatar: row.avatar_url,
-    interests: row.interests as Interest[],
     friendshipGoal: row.friendship_goal,
     communicationFormats: row.communication_formats as CommunicationFormat[],
     personalityTags: row.personality_tags as PersonalityTag[],
@@ -183,7 +179,6 @@ export function profileToUpsertRow(profile: UserProfile) {
     age: profile.age,
     bio: profile.bio,
     avatar_url: profile.avatar,
-    interests: profile.interests,
     friendship_goal: profile.friendshipGoal,
     communication_formats: profile.communicationFormats,
     personality_tags: profile.personalityTags,

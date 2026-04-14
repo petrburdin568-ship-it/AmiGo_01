@@ -1,37 +1,6 @@
-export type Interest =
-  | "music"
-  | "movies"
-  | "games"
-  | "sports"
-  | "books"
-  | "walks"
-  | "psychology"
-  | "tech"
-  | "art"
-  | "animals"
-  | "travel"
-  | "memes"
-  | "growth"
-  | "photography"
-  | "anime"
-  | "cooking"
-  | "fitness"
-  | "drawing"
-  | "design"
-  | "fashion"
-  | "history"
-  | "science"
-  | "cars"
-  | "football"
-  | "boardgames"
-  | "languages"
-  | "blogging"
-  | "streaming";
-
 export type FriendshipGoal =
   | "casual-talk"
   | "deep-friendship"
-  | "interest-based"
   | "free-time-company"
   | "shared-hobbies-online";
 
@@ -88,7 +57,6 @@ export type UserProfile = {
   age: number;
   bio: string;
   avatar: string;
-  interests: Interest[];
   friendshipGoal: FriendshipGoal;
   communicationFormats: CommunicationFormat[];
   personalityTags: PersonalityTag[];
@@ -99,12 +67,6 @@ export type UserProfile = {
   activeTitle: UserTitle;
   capabilityFlags: Capability[];
   coinBalance: number;
-};
-
-export type DirectoryResult = {
-  profile: UserProfile;
-  score: number;
-  reasons: string[];
 };
 
 export type ChatMessageType = "text" | "image" | "video" | "sticker" | "voice" | "video-note";

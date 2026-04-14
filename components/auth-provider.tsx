@@ -2,6 +2,7 @@
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { clearStoredAdminAccess, fetchAdminAccess } from "@/lib/admin-api";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getProfileByUserId, touchPresence } from "@/lib/supabase/queries";
 import { resolveAccessProfile } from "@/lib/title-system";
@@ -21,29 +22,6 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function fetchAdminAccess(session: Session | null) {
-  if (!session?.access_token) {
-    return false;
-  }
-
-  try {
-    const response = await fetch("/api/admin/status", {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`
-      }
-    });
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const payload = (await response.json()) as { unlocked?: boolean };
-    return payload.unlocked === true;
-  } catch {
-    return false;
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() => getSupabaseBrowserClient());
   const [session, setSession] = useState<Session | null>(null);
@@ -51,19 +29,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = useCallback(async (userId: string | null) => {
-    if (!userId) {
-      setProfile(null);
-      return;
-    }
+  const loadProfile = useCallback(
+    async (userId: string | null) => {
+      if (!userId) {
+        setProfile(null);
+        return;
+      }
 
-    try {
-      const nextProfile = await getProfileByUserId(supabase, userId);
-      setProfile(nextProfile);
-    } catch {
-      setProfile(null);
-    }
-  }, [supabase]);
+      try {
+        const nextProfile = await getProfileByUserId(supabase, userId);
+        setProfile(nextProfile);
+      } catch {
+        setProfile(null);
+      }
+    },
+    [supabase]
+  );
 
   useEffect(() => {
     let active = true;
@@ -180,6 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await supabase.auth.signOut();
         setProfile(null);
         setAdminUnlocked(false);
+        clearStoredAdminAccess();
       }
     }),
     [adminUnlocked, loadProfile, loading, profile, session, supabase]

@@ -36,6 +36,7 @@ import {
   sendVideoNoteMessage,
   sendVoiceMessage
 } from "@/lib/supabase/queries";
+import { isNativeAndroidApp, isNativeMediaCancelledError, pickNativeAndroidMediaFile } from "@/lib/native-media";
 import {
   CALL_RINGTONE_CHANGE_EVENT,
   getStoredCallRingtoneVolume,
@@ -224,6 +225,28 @@ function formatRecordingTime(seconds: number) {
   return `${mins}:${secs}`;
 }
 
+function getRecordingAccessErrorMessage(error: unknown, kind: "voice" | "video-note") {
+  if (error instanceof Error) {
+    if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+      return kind === "voice"
+        ? "Разреши доступ к микрофону, чтобы отправлять голосовые."
+        : "Разреши доступ к камере и микрофону, чтобы записывать кружки.";
+    }
+
+    if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+      return kind === "voice"
+        ? "На устройстве не найден микрофон для записи."
+        : "На устройстве не найдены камера или микрофон для записи кружка.";
+    }
+
+    if (error.message) {
+      return error.message;
+    }
+  }
+
+  return "Не удалось запустить запись.";
+}
+
 function clampContextMenuPosition(x: number, y: number, width: number, height: number) {
   if (typeof window === "undefined") {
     return { x, y };
@@ -243,6 +266,7 @@ export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const chatId = typeof params.chatId === "string" ? params.chatId : "";
+  const nativeAndroidApp = isNativeAndroidApp();
   const { loading, session, supabase } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1006,6 +1030,45 @@ export default function ChatPage() {
     } finally {
       setUploadingMedia(false);
       event.target.value = "";
+    }
+  }
+
+  async function handleNativeMediaAction() {
+    if (!session) {
+      return;
+    }
+
+    setMessage("");
+
+    try {
+      const file = await pickNativeAndroidMediaFile();
+      if (!file) {
+        return;
+      }
+
+      setUploadingMedia(true);
+      if (file.type.startsWith("image/")) {
+        const optimizedImage = await optimizeImageForUpload(file);
+        await sendImageMessage(supabase, chatId, session.user.id, optimizedImage, {
+          replyToMessageId: replyTarget?.id ?? null
+        });
+      } else {
+        const optimizedVideo = await optimizeVideoForUpload(file);
+        await sendVideoMessage(supabase, chatId, session.user.id, optimizedVideo, {
+          replyToMessageId: replyTarget?.id ?? null
+        });
+      }
+
+      clearReply();
+      await setTypingState(false);
+    } catch (error) {
+      if (isNativeMediaCancelledError(error)) {
+        return;
+      }
+
+      setMessage(error instanceof Error ? error.message : "Не удалось отправить вложение.");
+    } finally {
+      setUploadingMedia(false);
     }
   }
 
@@ -1904,6 +1967,11 @@ export default function ChatPage() {
   }
 
   function handleFileAction() {
+    if (nativeAndroidApp) {
+      void handleNativeMediaAction();
+      return;
+    }
+
     openFilePicker();
   }
 

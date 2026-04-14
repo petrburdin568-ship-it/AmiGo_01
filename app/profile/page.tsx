@@ -5,16 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminUnlockModal } from "@/components/admin-unlock-modal";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
-import { TagSelector } from "@/components/tag-selector";
 import { TitleBadge } from "@/components/title-badge";
 import { UserAvatar } from "@/components/user-avatar";
-import { INTEREST_OPTIONS } from "@/lib/constants";
 import { createInitialProfile } from "@/lib/profile-defaults";
 import { setActiveProfileTitle, upsertProfile } from "@/lib/supabase/queries";
 import { resolveActiveTitle } from "@/lib/title-system";
-import type { Interest, UserProfile } from "@/lib/types";
+import type { UserProfile } from "@/lib/types";
 
-const MIN_INTERESTS = 5;
 const MIN_BIO_LENGTH = 20;
 
 export default function ProfilePage() {
@@ -27,7 +24,6 @@ export default function ProfilePage() {
   const [tapCount, setTapCount] = useState(0);
   const [lastTapAt, setLastTapAt] = useState(0);
   const [unlockOpen, setUnlockOpen] = useState(false);
-  const [interestQuery, setInterestQuery] = useState("");
 
   useEffect(() => {
     if (!session) {
@@ -38,40 +34,16 @@ export default function ProfilePage() {
     setForm(profile ?? createInitialProfile(session.user.id));
   }, [profile, session]);
 
-  const filteredInterests = useMemo(() => {
-    const normalized = interestQuery.trim().toLowerCase();
-    if (!normalized) {
-      return INTEREST_OPTIONS;
-    }
-
-    return INTEREST_OPTIONS.filter((option) => option.label.toLowerCase().includes(normalized));
-  }, [interestQuery]);
-
   const isReady = useMemo(() => {
     if (!form) {
       return false;
     }
 
-    return form.name.trim().length > 1 && form.bio.trim().length >= MIN_BIO_LENGTH && form.interests.length >= MIN_INTERESTS;
+    return form.name.trim().length > 1 && form.bio.trim().length >= MIN_BIO_LENGTH;
   }, [form]);
 
   function updateForm(patch: Partial<UserProfile>) {
     setForm((current) => (current ? { ...current, ...patch } : current));
-  }
-
-  function toggleInterest(value: Interest) {
-    setForm((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        interests: current.interests.includes(value)
-          ? current.interests.filter((item) => item !== value)
-          : [...current.interests, value]
-      };
-    });
   }
 
   function selectActiveTitle(titleId: string) {
@@ -267,22 +239,27 @@ export default function ProfilePage() {
             </div>
 
             <div className="reference-form-column stack-md">
-              <div className="form-row">
-                <label htmlFor="interest-search">Поиск интересов</label>
-                <input
-                  id="interest-search"
-                  onChange={(event) => setInterestQuery(event.target.value)}
-                  placeholder="Найти интерес"
-                  value={interestQuery}
-                />
+              <div className="reference-sheet-block stack-sm">
+                <div className="panel-title">Что видно другим</div>
+                <p className="reference-sheet-copy">
+                  В профиле останутся только основные данные: имя, аватар, описание и активный титул.
+                </p>
+                <p className="reference-sheet-copy">
+                  Добавление друзей теперь работает напрямую по <span className="inline-accent">AmiGo ID</span>.
+                </p>
               </div>
 
-              <TagSelector<Interest> onToggle={toggleInterest} options={filteredInterests} selected={form.interests} />
-
               <div className="reference-inline-pills">
-                <span className="reference-meta-pill">Выбрано: {form.interests.length}</span>
-                <span className="reference-meta-pill">Минимум: {MIN_INTERESTS}</span>
-                <span className="reference-meta-pill">{isReady ? "Готово" : "Заполни до конца"}</span>
+                <span className="reference-meta-pill">AmiGo ID: {form.amigoId || "появится после сохранения"}</span>
+                <span className="reference-meta-pill">State ID: {form.stateId || "pending"}</span>
+                <span className="reference-meta-pill">{isReady ? "Профиль готов" : "Нужно заполнить описание"}</span>
+              </div>
+
+              <div className="reference-sheet-block stack-sm">
+                <div className="panel-title">Подсказка</div>
+                <p className="reference-sheet-copy">
+                  Чтобы профиль можно было сохранить, достаточно имени и описания не короче {MIN_BIO_LENGTH} символов.
+                </p>
               </div>
             </div>
           </div>
@@ -291,8 +268,8 @@ export default function ProfilePage() {
             <div className="stack-xs">
               <p className="reference-sheet-copy">
                 {isReady
-                  ? "Профиль готов к поиску и заявкам."
-                  : `Нужно описание от ${MIN_BIO_LENGTH} символов и минимум ${MIN_INTERESTS} интересов.`}
+                  ? "Профиль готов к сохранению и обмену AmiGo ID."
+                  : `Нужно имя и описание от ${MIN_BIO_LENGTH} символов.`}
               </p>
               <div className="reference-inline-pills">
                 <span className="reference-meta-pill">{savedAt ? `Сохранено в ${savedAt}` : "Ещё не сохранено"}</span>

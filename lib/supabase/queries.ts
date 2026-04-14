@@ -84,18 +84,6 @@ export async function setCustomTitle(
   return data;
 }
 
-export async function listDirectoryProfiles(supabase: SupabaseClient, currentUserId: string) {
-  const { data, error } = await supabase.rpc("list_directory_profiles", {
-    current_actor: currentUserId
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return (data as PublicProfileRow[]).map(mapPublicProfileRow);
-}
-
 export async function getProfileByAmigoId(supabase: SupabaseClient, amigoId: string) {
   const { data, error } = await supabase.rpc("get_directory_profile_by_amigo_id", {
     target_amigo_id: amigoId.trim().toUpperCase()

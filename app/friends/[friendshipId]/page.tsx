@@ -7,7 +7,6 @@ import { AppShell } from "@/components/app-shell";
 import { TitleBadge } from "@/components/title-badge";
 import { UserAvatar } from "@/components/user-avatar";
 import { useAuth } from "@/components/auth-provider";
-import { getInterestLabels } from "@/lib/constants";
 import { getFriendshipDetails } from "@/lib/supabase/queries";
 import type { FriendRecord } from "@/lib/types";
 
@@ -145,19 +144,6 @@ export default function FriendProfilePage() {
         <div className="reference-sheet-block stack-sm">
           <div className="reference-section-kicker">О себе</div>
           <div className="reference-profile-bio">{friend.profile.bio}</div>
-        </div>
-
-        <div className="reference-divider" />
-
-        <div className="reference-sheet-block stack-sm">
-          <div className="reference-section-kicker">Интересы</div>
-          <div className="tag-cloud">
-            {getInterestLabels(friend.profile.interests).map((label) => (
-              <span key={label} className="tag">
-                {label}
-              </span>
-            ))}
-          </div>
         </div>
 
         <div className="reference-divider" />

@@ -18,7 +18,6 @@ create table if not exists public.profiles (
   age integer not null check (age between 0 and 120),
   bio text not null default '',
   avatar_url text not null default '',
-  interests text[] not null default '{}',
   friendship_goal text not null default 'casual-talk',
   communication_formats text[] not null default '{}',
   personality_tags text[] not null default '{}',
@@ -954,51 +953,6 @@ revoke all on function public.consume_alpha_invite(text, uuid, text) from public
 revoke all on function public.consume_alpha_invite(text, uuid, text) from anon;
 revoke all on function public.consume_alpha_invite(text, uuid, text) from authenticated;
 
-create or replace function public.list_directory_profiles(current_actor uuid)
-returns table (
-  id uuid,
-  amigo_id text,
-  name text,
-  age integer,
-  bio text,
-  avatar_url text,
-  interests text[],
-  friendship_goal text,
-  communication_formats text[],
-  personality_tags text[],
-  icebreaker text,
-  availability text,
-  titles jsonb,
-  active_title_id text,
-  created_at timestamptz,
-  updated_at timestamptz
-)
-language sql
-security definer
-set search_path = public
-as $$
-  select
-    profiles.id,
-    profiles.amigo_id,
-    profiles.name,
-    profiles.age,
-    profiles.bio,
-    profiles.avatar_url,
-    profiles.interests,
-    profiles.friendship_goal,
-    profiles.communication_formats,
-    profiles.personality_tags,
-    profiles.icebreaker,
-    profiles.availability,
-    profiles.titles,
-    profiles.active_title_id,
-    profiles.created_at,
-    profiles.updated_at
-  from public.profiles
-  where profiles.id <> current_actor
-  order by profiles.updated_at desc;
-$$;
-
 create or replace function public.get_directory_profile_by_amigo_id(target_amigo_id text)
 returns table (
   id uuid,
@@ -1007,7 +961,6 @@ returns table (
   age integer,
   bio text,
   avatar_url text,
-  interests text[],
   friendship_goal text,
   communication_formats text[],
   personality_tags text[],
@@ -1029,7 +982,6 @@ as $$
     profiles.age,
     profiles.bio,
     profiles.avatar_url,
-    profiles.interests,
     profiles.friendship_goal,
     profiles.communication_formats,
     profiles.personality_tags,
@@ -1052,7 +1004,6 @@ returns table (
   age integer,
   bio text,
   avatar_url text,
-  interests text[],
   friendship_goal text,
   communication_formats text[],
   personality_tags text[],
@@ -1074,7 +1025,6 @@ as $$
     profiles.age,
     profiles.bio,
     profiles.avatar_url,
-    profiles.interests,
     profiles.friendship_goal,
     profiles.communication_formats,
     profiles.personality_tags,
@@ -1088,7 +1038,6 @@ as $$
   where profiles.id = any(target_ids);
 $$;
 
-grant execute on function public.list_directory_profiles(uuid) to authenticated;
 grant execute on function public.get_directory_profile_by_amigo_id(text) to authenticated;
 grant execute on function public.get_directory_profiles_by_ids(uuid[]) to authenticated;
 

@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { UserAvatar } from "@/components/user-avatar";
-import { getInterestLabels } from "@/lib/constants";
 import { listFriends } from "@/lib/supabase/queries";
 import type { FriendRecord } from "@/lib/types";
 
@@ -51,10 +50,7 @@ export default function FriendsPage() {
     }
 
     return friends.filter((friend) =>
-      [friend.profile.name, friend.profile.bio, friend.profile.amigoId, ...getInterestLabels(friend.profile.interests)]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalized)
+      [friend.profile.name, friend.profile.bio, friend.profile.amigoId].join(" ").toLowerCase().includes(normalized)
     );
   }, [friends, query]);
 
@@ -93,7 +89,7 @@ export default function FriendsPage() {
           <input
             className="reference-search-input"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Поиск по друзьям"
+            placeholder="Имя, AmiGo ID или описание"
             value={query}
           />
         </div>
@@ -128,7 +124,7 @@ export default function FriendsPage() {
 
         <div className="reference-bottom-action">
           <Link className="button button-primary reference-bottom-button" href="/discover">
-            Найти собеседника
+            Добавить друга
           </Link>
         </div>
       </section>

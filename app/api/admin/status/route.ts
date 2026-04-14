@@ -1,8 +1,7 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isPermanentAdminUserId } from "@/lib/admin-access";
-import { getAdminCookieName, verifyAdminSessionToken } from "@/lib/admin-session";
+import { handleAdminOptions, resolveAdminSession, withAdminCors } from "@/lib/admin-api-server";
 
 async function resolveSessionUserId(request: Request) {
   const authorization = request.headers.get("authorization");
@@ -34,20 +33,26 @@ async function resolveSessionUserId(request: Request) {
   return data.user.id;
 }
 
+export function OPTIONS(request: Request) {
+  return handleAdminOptions(request);
+}
+
 export async function GET(request: Request) {
   const userId = await resolveSessionUserId(request);
   if (!userId) {
-    return NextResponse.json({ unlocked: false });
+    return withAdminCors(request, NextResponse.json({ unlocked: false }));
   }
 
   if (isPermanentAdminUserId(userId)) {
-    return NextResponse.json({ unlocked: true });
+    return withAdminCors(request, NextResponse.json({ unlocked: true }));
   }
 
-  const token = cookies().get(getAdminCookieName())?.value;
-  const session = verifyAdminSessionToken(token);
+  const session = resolveAdminSession(request);
 
-  return NextResponse.json({
-    unlocked: session?.userId === userId
-  });
+  return withAdminCors(
+    request,
+    NextResponse.json({
+      unlocked: session?.userId === userId
+    })
+  );
 }

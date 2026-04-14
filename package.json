@@ -9,10 +9,15 @@
     "lint": "next lint",
     "android:add": "cap add android",
     "android:sync": "cap sync android",
-    "android:open": "cap open android"
+    "android:open": "cap open android",
+    "android:apk:debug": "powershell.exe -ExecutionPolicy Bypass -File scripts/build-android-apk.ps1 -BuildType Debug",
+    "android:apk:debug:existing": "powershell.exe -ExecutionPolicy Bypass -File scripts/build-android-apk.ps1 -BuildType Debug -SkipWebBuild",
+    "android:apk:debug:assets": "powershell.exe -ExecutionPolicy Bypass -File scripts/build-android-apk.ps1 -BuildType Debug -SkipWebBuild -SkipSync",
+    "android:apk:release": "powershell.exe -ExecutionPolicy Bypass -File scripts/build-android-apk.ps1 -BuildType Release"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",
+    "@capacitor/camera": "^8.1.0",
     "@capacitor/cli": "^8.3.0",
     "@capacitor/core": "^8.3.0",
     "@supabase/supabase-js": "^2.49.8",

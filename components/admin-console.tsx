@@ -2,12 +2,13 @@
 
 import { FormEvent, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
+import { grantAdminTitle } from "@/lib/admin-api";
 import type { TitleTone } from "@/lib/types";
 
 const toneOptions: Array<{ value: TitleTone; label: string }> = [
   { value: "gold", label: "Золото" },
   { value: "silver", label: "Серебро" },
-  { value: "cyan", label: "Лёд" },
+  { value: "cyan", label: "Лед" },
   { value: "royal", label: "Императорский" }
 ];
 
@@ -30,24 +31,13 @@ export function AdminConsole() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/admin/grant-title", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
-        },
-        body: JSON.stringify({
-          amigoId,
-          titleText,
-          reason,
-          tone
-        })
+      const payload = await grantAdminTitle({
+        amigoId,
+        titleText,
+        reason,
+        tone,
+        session
       });
-
-      const payload = (await response.json()) as { ok?: boolean; message?: string };
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.message ?? "Не удалось выдать титул.");
-      }
 
       setMessage(payload.message ?? "Титул выдан.");
       setAmigoId("");
@@ -130,7 +120,7 @@ export function AdminConsole() {
 
           <div className="reference-bottom-action reference-bottom-action-left">
             <button className="button button-primary" disabled={loading || !access.canGrantCustomTitles} type="submit">
-              {loading ? "Выдаём титул..." : "Выдать админский титул"}
+              {loading ? "Выдаем титул..." : "Выдать админский титул"}
             </button>
           </div>
         </form>

@@ -5,8 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { UserAvatar } from "@/components/user-avatar";
-import { getInterestLabels } from "@/lib/constants";
-import { acceptFriendRequest, listFriendRequests, listFriends } from "@/lib/supabase/queries";
+import { acceptFriendRequest, listFriendRequests } from "@/lib/supabase/queries";
 import type { FriendRequestRecord } from "@/lib/types";
 
 export default function RequestsPage() {
@@ -51,10 +50,7 @@ export default function RequestsPage() {
     }
 
     return requests.filter((request) =>
-      [request.profile.name, request.profile.bio, request.profile.amigoId, ...getInterestLabels(request.profile.interests)]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalized)
+      [request.profile.name, request.profile.bio, request.profile.amigoId].join(" ").toLowerCase().includes(normalized)
     );
   }, [requests, query]);
 
@@ -108,7 +104,7 @@ export default function RequestsPage() {
           <input
             className="reference-search-input"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Поиск по заявкам"
+            placeholder="Имя, AmiGo ID или описание"
             value={query}
           />
         </div>
@@ -144,7 +140,7 @@ export default function RequestsPage() {
 
         <div className="reference-bottom-action">
           <Link className="button button-primary reference-bottom-button" href="/discover">
-            Найти собеседника
+            Добавить друга
           </Link>
         </div>
       </section>

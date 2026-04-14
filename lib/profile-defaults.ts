@@ -1,9 +1,8 @@
 import { getDefaultTitles, resolveActiveTitle } from "@/lib/title-system";
-import type { Interest, UserProfile } from "@/lib/types";
+import type { UserProfile } from "@/lib/types";
 
 type InitialProfileOptions = {
   name?: string;
-  interests?: Interest[];
 };
 
 export function createInitialProfile(userId: string, options: InitialProfileOptions = {}): UserProfile {
@@ -18,7 +17,6 @@ export function createInitialProfile(userId: string, options: InitialProfileOpti
     bio: "",
     avatar:
       "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80",
-    interests: options.interests ?? [],
     friendshipGoal: "casual-talk",
     communicationFormats: ["text-only"],
     personalityTags: [],

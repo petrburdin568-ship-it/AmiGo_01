@@ -4,33 +4,24 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
-import { ProfileCard } from "@/components/profile-card";
-import { INTEREST_OPTIONS } from "@/lib/constants";
-import { searchDirectory } from "@/lib/directory";
 import {
   getProfileByAmigoId,
-  listDirectoryProfiles,
   listFriendRequests,
   listFriends,
   requestFriendship
 } from "@/lib/supabase/queries";
-import type { DirectoryResult, FriendRecord, FriendRequestRecord, Interest, UserProfile } from "@/lib/types";
+import type { FriendRecord, FriendRequestRecord, UserProfile } from "@/lib/types";
 
 export default function DiscoverPage() {
   const { loading, profile, session, supabase } = useAuth();
-  const [directoryProfiles, setDirectoryProfiles] = useState<UserProfile[]>([]);
   const [friends, setFriends] = useState<FriendRecord[]>([]);
   const [requests, setRequests] = useState<FriendRequestRecord[]>([]);
-  const [query, setQuery] = useState("");
-  const [selectedInterest, setSelectedInterest] = useState<Interest | "all">("all");
-  const [onlyNotFriends, setOnlyNotFriends] = useState(true);
   const [idLookup, setIdLookup] = useState("");
   const [message, setMessage] = useState("");
   const [loadingData, setLoadingData] = useState(false);
 
   useEffect(() => {
     if (!session) {
-      setDirectoryProfiles([]);
       setFriends([]);
       setRequests([]);
       return;
@@ -43,8 +34,7 @@ export default function DiscoverPage() {
       setLoadingData(true);
 
       try {
-        const [profiles, friendList, requestList] = await Promise.all([
-          listDirectoryProfiles(supabase, userId),
+        const [friendList, requestList] = await Promise.all([
           listFriends(supabase, userId),
           listFriendRequests(supabase, userId)
         ]);
@@ -53,7 +43,6 @@ export default function DiscoverPage() {
           return;
         }
 
-        setDirectoryProfiles(profiles);
         setFriends(friendList);
         setRequests(requestList);
       } catch (error) {
@@ -79,19 +68,14 @@ export default function DiscoverPage() {
     () => requests.filter((item) => item.direction === "outgoing").map((item) => item.profile.id),
     [requests]
   );
-
-  const results = useMemo<DirectoryResult[]>(() => {
-    if (!profile) {
-      return [];
-    }
-
-    return searchDirectory(profile, directoryProfiles, {
-      query,
-      selectedInterest,
-      onlyNotFriends,
-      friendIds
-    });
-  }, [directoryProfiles, friendIds, onlyNotFriends, profile, query, selectedInterest]);
+  const outgoingRequests = useMemo(
+    () => requests.filter((item) => item.direction === "outgoing"),
+    [requests]
+  );
+  const incomingCount = useMemo(
+    () => requests.filter((item) => item.direction === "incoming").length,
+    [requests]
+  );
 
   async function reloadLists(currentUserId: string) {
     const [friendList, requestList] = await Promise.all([
@@ -139,6 +123,16 @@ export default function DiscoverPage() {
         return;
       }
 
+      if (friendIds.includes(foundProfile.id)) {
+        setMessage(`${foundProfile.name} уже в друзьях.`);
+        return;
+      }
+
+      if (pendingRequestIds.includes(foundProfile.id)) {
+        setMessage(`Заявка для ${foundProfile.name} уже отправлена.`);
+        return;
+      }
+
       await handleRequest(foundProfile);
       setIdLookup("");
     } catch (error) {
@@ -148,10 +142,10 @@ export default function DiscoverPage() {
 
   if (!session && !loading) {
     return (
-      <AppShell mode="plain" title="Поиск" description="">
+      <AppShell mode="plain" title="Добавить друга" description="">
         <section className="discover-plain-block stack-md">
-          <h1 className="reference-sheet-heading">Поиск</h1>
-          <p className="reference-sheet-copy">Войди в аккаунт, чтобы искать людей и отправлять заявки в друзья.</p>
+          <h1 className="reference-sheet-heading">Добавить друга</h1>
+          <p className="reference-sheet-copy">Войди в аккаунт, чтобы отправлять заявки по AmiGo ID.</p>
           <Link className="button button-primary" href="/auth">
             Войти
           </Link>
@@ -162,10 +156,10 @@ export default function DiscoverPage() {
 
   if (!profile && !loading) {
     return (
-      <AppShell mode="plain" title="Поиск" description="">
+      <AppShell mode="plain" title="Добавить друга" description="">
         <section className="discover-plain-block stack-md">
-          <h1 className="reference-sheet-heading">Поиск</h1>
-          <p className="reference-sheet-copy">Сначала заполни профиль, потом можно будет искать собеседников.</p>
+          <h1 className="reference-sheet-heading">Добавить друга</h1>
+          <p className="reference-sheet-copy">Сначала заполни профиль, потом можно будет отправлять заявки по AmiGo ID.</p>
           <Link className="button button-primary" href="/profile">
             Перейти к профилю
           </Link>
@@ -175,12 +169,12 @@ export default function DiscoverPage() {
   }
 
   return (
-    <AppShell mode="plain" title="Поиск собеседника" description="">
+    <AppShell mode="plain" title="Добавить друга" description="">
       <section className="stack-xl">
         <div className="screen-heading-row">
           <div className="stack-xs">
-            <h1 className="reference-sheet-heading">Поиск</h1>
-            <p className="reference-sheet-copy">Ищи людей по интересам или добавляй напрямую по AmiGo ID.</p>
+            <h1 className="reference-sheet-heading">Добавить друга</h1>
+            <p className="reference-sheet-copy">Подбор по интересам убран. Теперь друзей можно добавлять напрямую по AmiGo ID.</p>
           </div>
           <Link className="button button-secondary" href="/requests">
             Заявки
@@ -206,78 +200,52 @@ export default function DiscoverPage() {
           </div>
 
           <div className="discover-plain-block stack-md">
-            <div className="panel-title">Фильтры</div>
-            <input
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Имя, интерес или описание"
-              value={query}
-            />
-
-            <div className="tag-cloud">
-              <button
-                className={`tag tag-selectable ${selectedInterest === "all" ? "tag-selected" : ""}`}
-                onClick={() => setSelectedInterest("all")}
-                type="button"
-              >
-                Все интересы
-              </button>
-              {INTEREST_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  className={`tag tag-selectable ${selectedInterest === option.value ? "tag-selected" : ""}`}
-                  onClick={() => setSelectedInterest(option.value)}
-                  type="button"
-                >
-                  {option.label}
-                </button>
-              ))}
+            <div className="panel-title">Быстрый доступ</div>
+            <p className="reference-sheet-copy">Управляй подтверждёнными контактами и входящими заявками из соседних разделов.</p>
+            <div className="hero-actions">
+              <Link className="button button-secondary" href="/friends">
+                Друзья
+              </Link>
+              <Link className="button button-secondary" href="/requests">
+                Заявки
+              </Link>
             </div>
-
-            <label className="checkbox-row">
-              <input
-                checked={onlyNotFriends}
-                onChange={(event) => setOnlyNotFriends(event.target.checked)}
-                type="checkbox"
-              />
-              <span>Скрывать тех, кто уже в друзьях</span>
-            </label>
+            <p className="reference-sheet-copy">
+              Если человек уже есть у тебя в друзьях или заявка ещё ожидает ответа, приложение подскажет это перед отправкой.
+            </p>
           </div>
         </section>
 
         <div className="row-between compact-row toolbar-row">
           <div className="status-strip">
-            <span>{loadingData ? "Загружаем каталог..." : `${results.length} в подборке`}</span>
-            <span>{requests.filter((item) => item.direction === "incoming").length} входящих заявок</span>
+            <span>{loadingData ? "Обновляем данные..." : `${friends.length} друзей`}</span>
+            <span>{incomingCount} входящих заявок</span>
+            <span>{outgoingRequests.length} исходящих заявок</span>
           </div>
         </div>
 
         {message ? <div className="toast-panel">{message}</div> : null}
 
-        {results.length === 0 ? (
+        {outgoingRequests.length === 0 ? (
           <section className="discover-plain-block stack-md">
-            <div className="panel-title">Пусто</div>
-            <p className="reference-sheet-copy">Попробуй убрать часть фильтров или изменить запрос.</p>
+            <div className="panel-title">Новых исходящих заявок нет</div>
+            <p className="reference-sheet-copy">Когда отправишь запрос по AmiGo ID, он появится здесь до подтверждения.</p>
           </section>
         ) : (
-          <section className="cards-list">
-            {results.map((result) => (
-              <div key={result.profile.id} className="grid discover-grid directory-entry">
-                <ProfileCard
-                  hasPendingRequest={pendingRequestIds.includes(result.profile.id)}
-                  isFriend={friendIds.includes(result.profile.id)}
-                  onAddFriend={() => void handleRequest(result.profile)}
-                  result={result}
-                />
-                <aside className="discover-plain-block directory-entry-reasons">
-                  <div className="panel-title">Почему в подборке</div>
-                  <ul className="bullet-list">
-                    {result.reasons.map((reason) => (
-                      <li key={reason}>{reason}</li>
-                    ))}
-                  </ul>
-                </aside>
-              </div>
-            ))}
+          <section className="discover-plain-block stack-md">
+            <div className="panel-title">Ожидают ответа</div>
+            <div className="request-list">
+              {outgoingRequests.map((request) => (
+                <article key={request.requestId} className="request-row">
+                  <div className="request-row-copy">
+                    <strong>{request.profile.name}</strong>
+                    <span>{request.profile.amigoId}</span>
+                    <p>Заявка отправлена и ждёт ответа.</p>
+                  </div>
+                  <span className="reference-meta-pill">Исходящая</span>
+                </article>
+              ))}
+            </div>
           </section>
         )}
       </section>

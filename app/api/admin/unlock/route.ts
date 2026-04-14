@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { handleAdminOptions, withAdminCors } from "@/lib/admin-api-server";
 import { createAdminSessionToken, getAdminCookieName } from "@/lib/admin-session";
 
 const attempts = new Map<string, { count: number; expiresAt: number }>();
@@ -53,6 +54,10 @@ async function resolveSessionUserId(request: Request) {
   return data.user.id;
 }
 
+export function OPTIONS(request: Request) {
+  return handleAdminOptions(request);
+}
+
 export async function POST(request: Request) {
   const headerStore = headers();
   const ipHeader = headerStore.get("x-forwarded-for") ?? headerStore.get("x-real-ip") ?? "local";
@@ -63,17 +68,23 @@ export async function POST(request: Request) {
   const currentAttempt = attempts.get(attemptKey);
 
   if (currentAttempt && currentAttempt.expiresAt > now && currentAttempt.count >= MAX_ATTEMPTS) {
-    return NextResponse.json(
-      { ok: false, message: "Слишком много попыток. Подожди 10 минут и попробуй снова." },
-      { status: 429 }
+    return withAdminCors(
+      request,
+      NextResponse.json(
+        { ok: false, message: "Слишком много попыток. Подожди 10 минут и попробуй снова." },
+        { status: 429 }
+      )
     );
   }
 
   const userId = await resolveSessionUserId(request);
   if (!userId) {
-    return NextResponse.json(
-      { ok: false, message: "Сначала войди в профильный аккаунт, затем открывай админ-доступ." },
-      { status: 401 }
+    return withAdminCors(
+      request,
+      NextResponse.json(
+        { ok: false, message: "Сначала войди в профильный аккаунт, затем открывай админ-доступ." },
+        { status: 401 }
+      )
     );
   }
 
@@ -81,7 +92,10 @@ export async function POST(request: Request) {
   const submittedKeys = body.keys?.map((item) => item.trim()).filter(Boolean) ?? [];
 
   if (submittedKeys.length !== 3) {
-    return NextResponse.json({ ok: false, message: "Нужно ввести все три ключа." }, { status: 400 });
+    return withAdminCors(
+      request,
+      NextResponse.json({ ok: false, message: "Нужно ввести все три ключа." }, { status: 400 })
+    );
   }
 
   const envKeys = [
@@ -91,9 +105,12 @@ export async function POST(request: Request) {
   ];
 
   if (envKeys.some((item) => !item)) {
-    return NextResponse.json(
-      { ok: false, message: "Серверные ключи администратора не настроены." },
-      { status: 500 }
+    return withAdminCors(
+      request,
+      NextResponse.json(
+        { ok: false, message: "Серверные ключи администратора не настроены." },
+        { status: 500 }
+      )
     );
   }
 
@@ -107,14 +124,19 @@ export async function POST(request: Request) {
       expiresAt: now + WINDOW_MS
     });
 
-    return NextResponse.json({ ok: false, message: "Ключи неверны." }, { status: 401 });
+    return withAdminCors(
+      request,
+      NextResponse.json({ ok: false, message: "Ключи неверны." }, { status: 401 })
+    );
   }
 
   attempts.delete(attemptKey);
 
+  const adminSessionToken = createAdminSessionToken(userId);
+
   cookies().set({
     name: getAdminCookieName(),
-    value: createAdminSessionToken(userId),
+    value: adminSessionToken,
     httpOnly: true,
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
@@ -122,5 +144,5 @@ export async function POST(request: Request) {
     maxAge: 60 * 60 * 24 * 7
   });
 
-  return NextResponse.json({ ok: true });
+  return withAdminCors(request, NextResponse.json({ ok: true, adminSessionToken }));
 }
