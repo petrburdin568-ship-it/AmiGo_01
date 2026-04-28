@@ -328,10 +328,6 @@ export default function ChatPage() {
   const [ringtoneSrc, setRingtoneSrc] = useState("/sounds/soft-ping-loop.mp3");
   const [ringtoneVolume, setRingtoneVolume] = useState(() => getStoredCallRingtoneVolume());
   const [callVibrationEnabled, setCallVibrationEnabled] = useState(() => getStoredCallVibrationEnabled());
-  const [arenaInvite, setArenaInvite] = useState<ArenaInvite | null>(null);
-  const [arenaMatch, setArenaMatch] = useState<ArenaMatch | null>(null);
-  const [arenaMenuOpen, setArenaMenuOpen] = useState(false);
-  const [arenaBusy, setArenaBusy] = useState(false);
 
   const messages = useMemo(() => {
     const messageMap = new Map(rawMessages.map((item) => [item.id, item]));
@@ -606,8 +602,6 @@ export default function ChatPage() {
     if (!session || !chatId) {
       setFriend(null);
       setRawMessages([]);
-      setArenaInvite(null);
-      setArenaMatch(null);
       return;
     }
 
@@ -644,83 +638,6 @@ export default function ChatPage() {
 
     return () => {
       active = false;
-    };
-  }, [chatId, session, supabase]);
-
-  useEffect(() => {
-    if (!session || !chatId) {
-      setArenaInvite(null);
-      setArenaMatch(null);
-      return;
-    }
-
-    let active = true;
-
-    async function loadArenaState() {
-      try {
-        const latestInvite = await getLatestArenaInvite(supabase, chatId);
-        if (!active) {
-          return;
-        }
-
-        setArenaInvite(latestInvite);
-
-        if (latestInvite?.arenaMatchId) {
-          const nextMatch = await getArenaMatch(supabase, latestInvite.arenaMatchId);
-          if (!active) {
-            return;
-          }
-
-          setArenaMatch(nextMatch);
-        } else {
-          setArenaMatch(null);
-        }
-      } catch {
-        if (active) {
-          setArenaInvite(null);
-          setArenaMatch(null);
-        }
-      }
-    }
-
-    void loadArenaState();
-
-    const invitesChannel = supabase
-      .channel(`arena-invites:${chatId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "arena_invites",
-          filter: `friendship_id=eq.${chatId}`
-        },
-        () => {
-          void loadArenaState();
-        }
-      )
-      .subscribe();
-
-    const matchesChannel = supabase
-      .channel(`arena-matches:${chatId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "arena_matches",
-          filter: `friendship_id=eq.${chatId}`
-        },
-        () => {
-          void loadArenaState();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      active = false;
-      void supabase.removeChannel(invitesChannel);
-      void supabase.removeChannel(matchesChannel);
     };
   }, [chatId, session, supabase]);
 
@@ -1982,50 +1899,6 @@ export default function ChatPage() {
     }
   }
 
-  async function handleCreateArenaInvite() {
-    if (!session) {
-      return;
-    }
-
-    setArenaBusy(true);
-    setMessage("");
-
-    try {
-      const invite = await createArenaInvite(supabase, chatId);
-      setArenaInvite(invite);
-      setArenaMenuOpen(false);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось отправить вызов на арену.");
-    } finally {
-      setArenaBusy(false);
-    }
-  }
-
-  async function handleArenaInviteResponse(nextStatus: "accepted" | "declined" | "cancelled") {
-    if (!arenaInvite) {
-      return;
-    }
-
-    setArenaBusy(true);
-    setMessage("");
-
-    try {
-      const invite = await respondArenaInvite(supabase, arenaInvite.id, nextStatus);
-      setArenaInvite(invite);
-      if (invite.arenaMatchId) {
-        const match = await getArenaMatch(supabase, invite.arenaMatchId);
-        setArenaMatch(match);
-      }
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось обновить приглашение на арену.");
-    } finally {
-      setArenaBusy(false);
-    }
-  }
-
-  const isArenaSender = arenaInvite?.senderId === session?.user.id;
-  const isArenaRecipient = arenaInvite?.recipientId === session?.user.id;
-  const hasArenaMatch = Boolean(arenaInvite?.arenaMatchId);
   const presenceLabel = getPresenceLabel(friend, otherTyping);
   const latestMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const dayLabel = formatConversationDayLabel(latestMessage?.sentAt);
@@ -2124,28 +1997,6 @@ export default function ChatPage() {
               Завершить
             </button>
 
-            {arenaInvite?.status === "accepted" && hasArenaMatch ? (
-              <Link className="button button-secondary tg-arena-call" href={`/arena/${arenaInvite?.arenaMatchId ?? ""}`} onClick={() => setArenaMenuOpen(false)}>
-                РћС‚РєСЂС‹С‚СЊ Р°СЂРµРЅСѓ
-              </Link>
-            ) : null}
-
-            {arenaInvite?.status === "pending" && isArenaRecipient ? (
-              <>
-                <button className="button button-primary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("accepted")} type="button">
-                  РџСЂРёРЅСЏС‚СЊ РІС‹Р·РѕРІ
-                </button>
-                <button className="button button-secondary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("declined")} type="button">
-                  РћС‚РєР»РѕРЅРёС‚СЊ
-                </button>
-              </>
-            ) : null}
-
-            {arenaInvite?.status === "pending" && isArenaSender ? (
-              <button className="button button-secondary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("cancelled")} type="button">
-                РћС‚РјРµРЅРёС‚СЊ РІС‹Р·РѕРІ
-              </button>
-            ) : null}
           </div>
         </div>
       ) : null}
@@ -2281,50 +2132,6 @@ export default function ChatPage() {
                 ))
               )}
             </div>
-          </div>
-        </div>
-      ) : null}
-
-      {arenaMenuOpen ? (
-        <div className="tg-forward-overlay" onClick={() => (arenaBusy ? undefined : setArenaMenuOpen(false))} role="dialog">
-          <div className="tg-forward-sheet tg-arena-sheet" onClick={(event) => event.stopPropagation()}>
-            <div className="tg-forward-head">
-              <strong>Арена</strong>
-              <button className="tg-forward-close" onClick={() => setArenaMenuOpen(false)} type="button">
-                ×
-              </button>
-            </div>
-
-            <div className="tg-arena-sheet-copy">
-              <p>Вызови собеседника на дуэль. После принятия приглашения вы оба настроите бойца и начнёте пошаговый бой.</p>
-            </div>
-
-            <button className="button button-primary tg-arena-call" disabled={arenaBusy} onClick={() => void handleCreateArenaInvite()} type="button">
-              {arenaBusy ? "Отправляем..." : "Вызвать на арену"}
-            </button>
-
-            {arenaInvite?.status === "accepted" && hasArenaMatch ? (
-              <Link className="button button-secondary tg-arena-call" href={`/arena/${arenaInvite?.arenaMatchId ?? ""}`} onClick={() => setArenaMenuOpen(false)}>
-                Открыть арену
-              </Link>
-            ) : null}
-
-            {arenaInvite?.status === "pending" && isArenaRecipient ? (
-              <>
-                <button className="button button-primary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("accepted")} type="button">
-                  Принять вызов
-                </button>
-                <button className="button button-secondary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("declined")} type="button">
-                  Отклонить
-                </button>
-              </>
-            ) : null}
-
-            {arenaInvite?.status === "pending" && isArenaSender ? (
-              <button className="button button-secondary tg-arena-call" disabled={arenaBusy} onClick={() => void handleArenaInviteResponse("cancelled")} type="button">
-                Отменить вызов
-              </button>
-            ) : null}
           </div>
         </div>
       ) : null}
@@ -2560,9 +2367,8 @@ export default function ChatPage() {
             </button>
 
             <button
-              aria-label="Открыть арену"
-              className={`tg-compose-icon tg-compose-swords ${arenaInvite?.status === "pending" ? "tg-compose-icon-active" : ""}`}
-              onClick={() => setArenaMenuOpen(true)}
+              aria-label="Открыть меню"
+              className="tg-compose-icon"
               type="button"
             >
               ⚔

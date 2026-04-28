@@ -13,6 +13,7 @@ import {
   getStoredCallVibrationEnabled,
   resolveCallRingtoneSource
 } from "@/lib/call-ringtone";
+import { addNativePushListeners, isNativeAndroidApp, registerNativePushNotifications } from "@/lib/native-push";
 import { listFriendRequests, listFriends } from "@/lib/supabase/queries";
 import type { ChatMessageType, FriendRecord, FriendRequestRecord } from "@/lib/types";
 
@@ -262,6 +263,47 @@ export function GlobalActivity() {
     void refreshFriends().catch(() => undefined);
     void refreshRequests().catch(() => undefined);
   }, [clearIncomingCall, refreshFriends, refreshRequests, session]);
+
+  useEffect(() => {
+    if (!session || !isNativeAndroidApp()) {
+      return;
+    }
+
+    let removePushListeners: (() => void) | null = null;
+    let active = true;
+
+    async function initPushNotifications() {
+      try {
+        removePushListeners = await addNativePushListeners({
+          onRegistration: (token) => {
+            console.log("AmiGo push registration token:", token);
+          },
+          onRegistrationError: (errorMessage) => {
+            console.warn("AmiGo push registration error:", errorMessage);
+          },
+          onPushReceived: (notification) => {
+            if (!active) {
+              return;
+            }
+
+            const payload = notification as { title?: string; body?: string };
+            showBrowserActivity(payload.title ?? "AmiGo", payload.body ?? "New activity");
+          }
+        });
+
+        await registerNativePushNotifications();
+      } catch (error) {
+        console.warn("Failed to initialize native push notifications", error);
+      }
+    }
+
+    void initPushNotifications();
+
+    return () => {
+      active = false;
+      removePushListeners?.();
+    };
+  }, [session]);
 
   useEffect(() => {
     if (typeof window === "undefined") {

@@ -1,18 +1,25 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export', // Добавляем эту строку для создания статических файлов
+  output: 'export', // Статический экспорт для APK
   experimental: {
     typedRoutes: true,
   },
   images: {
-    unoptimized: true, // Обязательно для статического экспорта (APK)
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
-      // Если ты используешь картинки из Supabase, добавь его хост сюда тоже
     ],
+  },
+  webpack: (config, { isServer }) => {
+    config.externals.push({
+      '@capacitor/push-notifications': 'commonjs @capacitor/push-notifications',
+      '@capacitor/camera': 'commonjs @capacitor/camera',
+      '@capacitor/core': 'commonjs @capacitor/core',
+    });
+    return config;
   },
 };
 

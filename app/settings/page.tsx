@@ -11,6 +11,11 @@ import {
   type BrowserNotificationPermissionState
 } from "@/lib/browser-notifications";
 import {
+  getNativePushPermissionState,
+  isNativeAndroidApp,
+  requestNativePushPermission
+} from "@/lib/native-push";
+import {
   BUILT_IN_CALL_RINGTONES,
   getStoredCallRingtoneVolume,
   getStoredCallVibrationEnabled,
@@ -175,11 +180,16 @@ export default function SettingsPage() {
   }, [ringtoneVolume]);
 
   useEffect(() => {
-    function syncPermission() {
+    async function syncPermission() {
+      if (isNativeAndroidApp()) {
+        setNotificationPermission(await getNativePushPermissionState());
+        return;
+      }
+
       setNotificationPermission(getBrowserNotificationPermission());
     }
 
-    syncPermission();
+    void syncPermission();
     window.addEventListener("focus", syncPermission);
 
     return () => {
@@ -256,6 +266,12 @@ export default function SettingsPage() {
   }
 
   async function handleNotificationPermissionRequest() {
+    if (isNativeAndroidApp()) {
+      const nextPermission = await requestNativePushPermission();
+      setNotificationPermission(nextPermission);
+      return;
+    }
+
     const nextPermission = await requestBrowserNotificationPermission();
     setNotificationPermission(nextPermission);
   }
